@@ -4,6 +4,16 @@ A WordPress plugin that adds a customizable information block at the top of the 
 
 ![screen](./screens/FireShot%20Capture%20067%20-%20MySite.local%20-%20[mysite.local].png)
 
+## Installation And Updates
+
+1. Download `wp-top-info-bar.zip` from the latest [release](https://github.com/Andrusi4ka/WP-Top-Info-Bar/releases).
+2. In WordPress go to `Plugins -> Add New -> Upload Plugin`, upload the zip and activate it.
+3. Open `Top Info Bar` in the admin menu.
+
+Newer versions then appear under `Plugins` like any other update. Settings are stored in the database and are kept across updates.
+
+To publish a version: raise `Version` and `WP_TOP_INFO_BAR_VERSION` in `wp-top-info-bar.php`, `Stable tag` and the changelog in `readme.txt`, regenerate `languages/wp-top-info-bar.pot`, commit, then push a tag `vX.Y.Z`. The release workflow builds `wp-top-info-bar.zip` and attaches it to the release.
+
 ## Purpose
 
 The plugin is designed to display an information banner at the top of the site without manually editing the theme or templates.
@@ -82,8 +92,8 @@ For each image, you can choose:
 Separate values are supported for:
 
 - `desktop`
-- `tablet` — `max-width: 1200px`
-- `mobile` — `max-width: 768px`
+- `tablet` — `max-width: 1024px`
+- `mobile` — `max-width: 767px`
 
 Supported for:
 

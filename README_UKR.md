@@ -84,8 +84,8 @@
 Для таких параметрів підтримуються окремі значення для:
 
 - `desktop`
-- `tablet` — `max-width: 1200px`
-- `mobile` — `max-width: 768px`
+- `tablet` — `max-width: 1024px`
+- `mobile` — `max-width: 767px`
 
 Підтримується для:
 

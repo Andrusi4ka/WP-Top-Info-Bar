@@ -1,0 +1,16 @@
+# Normalise line endings in the repository.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.svg text
+
+# Not part of the installable plugin (left out of wp-top-info-bar.zip by git archive).
+/.github        export-ignore
+/.github/**     export-ignore
+/.gitattributes export-ignore
+/.gitignore     export-ignore
+/README.md      export-ignore
+/README_UKR.md  export-ignore
+/screens        export-ignore
+/screens/**     export-ignore

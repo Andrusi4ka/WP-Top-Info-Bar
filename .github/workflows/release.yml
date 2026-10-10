@@ -1,0 +1,36 @@
+# Publishes a release with wp-top-info-bar.zip for every "vX.Y.Z" tag; sites with
+# the plugin then see the update (wp-top-info-bar.php: wp_top_info_bar_updates()).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the tag matches the plugin version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          header=$(grep -m1 -oP '^\s*\*\s*Version:\s*\K\S+' wp-top-info-bar.php)
+          stable=$(grep -m1 -oP '^Stable tag:\s*\K\S+' readme.txt)
+          if [ "$tag" != "$header" ] || [ "$tag" != "$stable" ]; then
+            echo "::error::Tag v$tag, wp-top-info-bar.php Version $header and readme.txt Stable tag $stable must match."
+            exit 1
+          fi
+
+      # git archive leaves out what .gitattributes marks export-ignore (dev files).
+      - name: Build wp-top-info-bar.zip
+        run: git archive --format=zip --prefix=wp-top-info-bar/ -o wp-top-info-bar.zip HEAD
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: wp-top-info-bar.zip
+          generate_release_notes: true
