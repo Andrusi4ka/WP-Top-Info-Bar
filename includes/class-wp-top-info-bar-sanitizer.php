@@ -31,7 +31,11 @@ final class WP_Top_Info_Bar_Sanitizer {
 			'custom_id'        => $this->sanitize_html_identifier($this->text($input, 'custom_id', '')),
 			'images'           => $this->sanitize_images($input['images'] ?? array()),
 		);
-		foreach (array('padding', 'margin') as $key) {
+		return $this->apply_spacing_sides($input, $out, array('padding', 'margin'));
+	}
+
+	private function apply_spacing_sides(array $input, array $out, array $keys): array {
+		foreach ($keys as $key) {
 			if (! isset($input[$key . '_sides']) || ! is_array($input[$key . '_sides'])) {
 				continue;
 			}
@@ -196,7 +200,7 @@ final class WP_Top_Info_Bar_Sanitizer {
 				continue;
 			}
 
-			$sanitized_images[] = array(
+			$clean_image = array(
 				'image_id'     => $image_id,
 				'size'         => $this->sanitize_css_size($this->text($image, 'size', ''), ''),
 				'size_tablet'  => $this->sanitize_css_size($this->text($image, 'size_tablet', ''), ''),
@@ -209,6 +213,12 @@ final class WP_Top_Info_Bar_Sanitizer {
 				'custom_class' => $this->sanitize_class_list($this->text($image, 'custom_class', '')),
 				'position'     => $this->sanitize_position($this->text($image, 'position', 'left')),
 			);
+			foreach (array('size', 'size_tablet', 'size_mobile') as $key) {
+				if (preg_match('/^(-?(?:\d+(?:\.\d+)?|\.\d+))(?:px)?$/i', trim($clean_image[$key]), $match)) {
+					$clean_image[$key] = max(0, (float) $match[1]) . 'px';
+				}
+			}
+			$sanitized_images[] = $this->apply_spacing_sides($image, $clean_image, array('margin'));
 		}
 
 		return $sanitized_images;

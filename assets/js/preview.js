@@ -73,18 +73,19 @@
   });
   $box.find('.wp-top-info-bar-admin__device-input').each(function() { this.hidden = $(this).data('device') !== device; });
   $box.find('.wp-top-info-bar-admin__spacing-inputs').each(function() { this.hidden = $(this).data('device') !== device; });
+  $box.find('.wp-top-info-bar-admin__responsive-device').each(function() { this.hidden = $(this).data('device') !== device; });
   fitPreview();
   try { localStorage.setItem('wpTopInfoBarDevice', device); } catch(e) {}
  }
  $box.on('click', '.wp-top-info-bar-admin__device', function() {
   setDevice($(this).data('device'));
-  $(this).closest('tr').find('input:visible').first().trigger('focus');
+  $(this).closest('.wp-top-info-bar-image-row__field, tr').find('input:visible').first().trigger('focus');
  });
  $box.on('input change', '.wp-top-info-bar-admin__device-input', syncTextSizes);
  syncTextSizes();
  function syncSpacing() {
-  ['padding', 'margin'].forEach(function(key) {
-   const $row = $box.find('.wp-top-info-bar-field-' + key);
+  $box.find('.wp-top-info-bar-field-padding, .wp-top-info-bar-field-margin, .wp-top-info-bar-image-margin-field').each(function() {
+   const $row = $(this);
    const inherited = {top:'0', right:'0', bottom:'0', left:'0'};
    devices.forEach(function(device) {
     let own = false;
@@ -102,6 +103,29 @@
   syncSpacing();
  });
  syncSpacing();
+ function syncImageSizes() {
+  $box.find('.wp-top-info-bar-image-size-field').each(function() {
+   const $field = $(this);
+   let inherited = '40';
+   devices.forEach(function(device) {
+    const $input = $field.find('.wp-top-info-bar-admin__responsive-device[data-device="' + device + '"] [data-image-size]');
+    const value = $.trim($input.siblings('.wp-top-info-bar-image-size-value').val() || '');
+    $input.attr('placeholder', value && $input.val() === '' ? value : inherited);
+    $field.find('.wp-top-info-bar-admin__device[data-device="' + device + '"]').toggleClass('has-value', device !== 'desktop' && value !== '');
+    if(value) inherited = value.replace(/px$/i, '');
+   });
+  });
+ }
+ $box.on('input change', '[data-image-size]', function() {
+  $(this).siblings('.wp-top-info-bar-image-size-value').val(this.value);
+  syncImageSizes();
+ });
+ $box.on('wpTopInfoBarImagesChanged', function() {
+  syncImageSizes();
+  syncSpacing();
+  setDevice(currentDevice);
+ });
+ syncImageSizes();
  $preview.on('click','.wp-top-info-bar-preview__device-btn',function(){setDevice($(this).data('device'));});
  $box.on('click', '.wp-top-info-bar-admin__menu-item', function() {
   const page = $(this).data('page');
@@ -109,6 +133,7 @@
    $(this).attr('aria-current', $(this).data('page') === page ? 'true' : 'false');
   });
   $box.find('.wp-top-info-bar-admin__page').each(function() { this.hidden = $(this).data('page') !== page; });
+  $box.trigger('wpTopInfoBarPageChange');
  });
 		var sizes = $preview.data( 'sizes' ) || {};
 		var drawings = $preview.data( 'devices' ) || {};

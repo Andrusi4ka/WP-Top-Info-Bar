@@ -36,6 +36,10 @@
 
 			frame.on('select', function () {
 				const attachment = frame.state().get('selection').first().toJSON();
+				let filename = attachment.filename || String(attachment.url || '').split(/[?#]/)[0].split('/').pop() || '';
+				try { filename = decodeURIComponent(filename); } catch (e) {}
+				$row.find('[data-image-filename]').text(filename);
+				$row.find('[data-replace-image]').text(labels.replaceImage || 'Replace image');
 				let previewUrl = attachment.url;
 
 				if (attachment.sizes && attachment.sizes.thumbnail && attachment.sizes.thumbnail.url) {
@@ -60,7 +64,9 @@
 
 	function bindRemoveRow($row) {
 		$row.find('[data-remove-image-row]').off('click').on('click', function () {
+			const $box = $row.closest('.wp-top-info-bar-admin');
 			$row.remove();
+			$box.trigger('wpTopInfoBarImagesChanged');
 		});
 	}
 
@@ -91,7 +97,10 @@
 	$(function () {
 		const editorId = 'wp-top-info-bar-message';
 		const $message = $('#' + editorId);
-		if ($message.length && window.wp && wp.editor && wp.editor.initialize) {
+		let editorStarted = false;
+		function startTextEditor() {
+			if (editorStarted || !$message.is(':visible') || !window.wp || !wp.editor || !wp.editor.initialize) return;
+			editorStarted = true;
 			const palette = Array.isArray(config.textColors) ? config.textColors : [];
 			wp.editor.initialize(editorId, {
 				tinymce: window.tinymce ? {
@@ -113,6 +122,8 @@
 				mediaButtons: false
 			});
 		}
+		$('.wp-top-info-bar-admin').on('wpTopInfoBarPageChange', startTextEditor);
+		startTextEditor();
 
 		const $list = $('[data-images-list]');
 		const template = wp.template('wp-top-info-bar-image-row');
@@ -131,6 +142,7 @@
 
 			$list.append($row);
 			bindRow($row);
+			$list.closest('.wp-top-info-bar-admin').trigger('wpTopInfoBarImagesChanged');
 		});
 	});
 }(jQuery));

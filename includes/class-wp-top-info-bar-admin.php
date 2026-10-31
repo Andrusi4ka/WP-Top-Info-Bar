@@ -179,6 +179,7 @@ final class WP_Top_Info_Bar_Admin {
 		foreach ($fields as $id => $field) {
 			$page = in_array($id, array('padding', 'margin'), true) ? 'spacing' : (in_array($id, array('message', 'font_size', 'text_color'), true) ? 'text' : (in_array($id, array('animation', 'text_delay'), true) ? 'animation' : (in_array($id, array('custom_class', 'custom_id'), true) ? 'custom' : 'generell')));
 			if ('background_color' === $id) { $page = 'background'; }
+			if ('images' === $id) { $page = 'pictures'; }
 			$title = $this->get_settings_field_title_markup($field['label'], $field['tooltip']);
 			if (in_array($id, array('font_size', 'padding', 'margin'), true)) {
 				$title .= '<span class="wp-top-info-bar-admin__devices" role="group" aria-label="' . esc_attr($field['label'] . ' ? ' . __('Device', 'wp-top-info-bar')) . '">';
@@ -201,6 +202,8 @@ final class WP_Top_Info_Bar_Admin {
 	private static function pages(): array {
 		return array(
 			'generell' => array(__('Generell', 'wp-top-info-bar'), 'dashicons-admin-generic'),
+			'text' => array(__('Text', 'wp-top-info-bar'), 'dashicons-editor-textcolor'),
+			'pictures' => array(__('Pictures', 'wp-top-info-bar'), 'dashicons-format-gallery'),
 			'animation' => array(__('Animation', 'wp-top-info-bar'), 'dashicons-controls-play'),
 			'custom' => array(__('Custom', 'wp-top-info-bar'), 'dashicons-editor-code'),
 		);
@@ -226,12 +229,15 @@ final class WP_Top_Info_Bar_Admin {
 				<?php foreach (self::pages() as $page => $meta) : ?>
 					<fieldset class="wp-top-info-bar-admin__page" id="wp-top-info-bar-page-<?php echo esc_attr($page); ?>" data-page="<?php echo esc_attr($page); ?>"<?php echo 'generell' === $page ? '' : ' hidden'; ?>>
 						<legend><?php echo esc_html($meta[0]); ?></legend>
-						<?php if ('generell' === $page) : ?>
+						<?php if ('text' === $page) : ?>
 						<div class="wp-top-info-bar-admin__text-block"><table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_text'); ?></tbody></table></div>
+						<?php elseif ('generell' === $page) : ?>
 						<div class="wp-top-info-bar-admin__background-block"><table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_background'); ?></tbody></table></div>
 						<div class="wp-top-info-bar-admin__spacing-block"><table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_spacing'); ?></tbody></table></div>
 						<?php endif; ?>
+						<?php if (! in_array($page, array('text', 'generell'), true)) : ?>
 						<table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_' . $page); ?></tbody></table>
+						<?php endif; ?>
 					</fieldset>
 				<?php endforeach; ?>
 				</div>
@@ -291,6 +297,7 @@ final class WP_Top_Info_Bar_Admin {
 				'previewError' => __('Could not load the preview. Try Update again.', 'wp-top-info-bar'),
 				'labels'     => array(
 					'changeImage'  => __('Change image', 'wp-top-info-bar'),
+					'replaceImage' => __('Replace image', 'wp-top-info-bar'),
 					'chooseImage'  => __('Choose image', 'wp-top-info-bar'),
 					'useImage'     => __('Use this image', 'wp-top-info-bar'),
 				),
@@ -391,14 +398,18 @@ final class WP_Top_Info_Bar_Admin {
 
 	private function render_spacing(string $key): void {
 		$settings = $this->settings->get_settings();
+		$this->spacing_fields($key, $settings, WP_Top_Info_Bar_Settings::OPTION_NAME);
+	}
+
+	private function spacing_fields(string $key, array $settings, string $name_prefix): void {
 		$labels = array('top' => __('Top', 'wp-top-info-bar'), 'right' => __('Right', 'wp-top-info-bar'), 'bottom' => __('Bottom', 'wp-top-info-bar'), 'left' => __('Left', 'wp-top-info-bar'));
 		foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) {
-			$values = isset($settings[$key . '_sides'][$device]) && is_array($settings[$key . '_sides'][$device]) ? $settings[$key . '_sides'][$device] : WP_Top_Info_Bar_Sanitizer::spacing_sides($settings[$key . $suffix]);
+			$values = isset($settings[$key . '_sides'][$device]) && is_array($settings[$key . '_sides'][$device]) ? $settings[$key . '_sides'][$device] : WP_Top_Info_Bar_Sanitizer::spacing_sides((string) ($settings[$key . $suffix] ?? ''));
 			echo '<div class="wp-top-info-bar-admin__spacing-inputs" data-device="' . esc_attr($device) . '"' . ('desktop' === $device ? '' : ' hidden') . '>';
 			foreach ($labels as $side => $label) {
 				$value = (string) ($values[$side] ?? '');
 				$number = preg_match('/^(-?(?:\d+(?:\.\d+)?|\.\d+))(?:px)?$/i', trim($value), $match) ? (string) (float) $match[1] : '';
-				printf('<label><span>%1$s (px)</span><input type="number" step="any"%8$s class="regular-text" data-side="%2$s" value="%6$s" aria-label="%7$s"><input type="hidden" class="wp-top-info-bar-admin__spacing-value" name="%3$s[%4$s_sides][%5$s][%2$s]" value="%9$s"></label>', esc_html($label), esc_attr($side), esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME), esc_attr($key), esc_attr($device), esc_attr($number), esc_attr(ucfirst($key) . ': ' . $label . ' (px, ' . $device . ')'), 'padding' === $key ? ' min="0"' : '', esc_attr($value));
+				printf('<label><span>%1$s (px)</span><input type="number" step="any"%8$s class="regular-text" data-side="%2$s" value="%6$s" aria-label="%7$s"><input type="hidden" class="wp-top-info-bar-admin__spacing-value" name="%3$s[%4$s_sides][%5$s][%2$s]" value="%9$s"></label>', esc_html($label), esc_attr($side), esc_attr($name_prefix), esc_attr($key), esc_attr($device), esc_attr($number), esc_attr(ucfirst($key) . ': ' . $label . ' (px, ' . $device . ')'), 'padding' === $key ? ' min="0"' : '', esc_attr($value));
 			}
 			echo '</div>';
 		}
@@ -482,6 +493,8 @@ final class WP_Top_Info_Bar_Admin {
 		$custom_class = isset($image['custom_class']) ? (string) $image['custom_class'] : '';
 		$position = isset($image['position']) ? (string) $image['position'] : 'left';
 		$image_url = $image_id ? wp_get_attachment_image_url($image_id, 'thumbnail') : '';
+		$image_file = $image_id ? get_attached_file($image_id) : '';
+		$filename = $image_file ? wp_basename($image_file) : ($image_url ? wp_basename((string) wp_parse_url($image_url, PHP_URL_PATH)) : '');
 		$field_name = WP_Top_Info_Bar_Settings::OPTION_NAME . '[images][' . $index . ']';
 		$animation_options = array(
 			'none'                => __('No animation', 'wp-top-info-bar'),
@@ -498,6 +511,7 @@ final class WP_Top_Info_Bar_Admin {
 			<div class="wp-top-info-bar-image-row__grid">
 				<div class="wp-top-info-bar-image-row__field wp-top-info-bar-image-row__field--preview">
 					<label><?php echo esc_html__('Preview', 'wp-top-info-bar'); ?></label>
+				<div class="wp-top-info-bar-image-row__summary">
 				<button
 					type="button"
 					class="wp-top-info-bar-image-row__preview<?php echo $image_url ? ' has-image' : ''; ?>"
@@ -512,77 +526,28 @@ final class WP_Top_Info_Bar_Admin {
 					<span class="wp-top-info-bar-image-row__preview-plus" aria-hidden="true">+</span>
 					<span class="wp-top-info-bar-image-row__preview-edit" aria-hidden="true"></span>
 				</button>
+				<span class="wp-top-info-bar-image-row__filename" data-image-filename><?php echo esc_html($filename ? rawurldecode($filename) : __('No image selected', 'wp-top-info-bar')); ?></span>
 				</div>
-				<div class="wp-top-info-bar-image-row__field">
-					<label class="wp-top-info-bar-image-row__label-with-tooltip">
-						<span><?php echo esc_html__('Size', 'wp-top-info-bar'); ?></span>
-						<span
-							class="wp-top-info-bar-tooltip"
-							tabindex="0"
-							aria-label="<?php echo esc_attr__('Use a standard CSS size value, for example: 40px, 2rem or 10%. This value sets the image width.', 'wp-top-info-bar'); ?>"
-						>
-							<img
-								src="<?php echo esc_url(WP_TOP_INFO_BAR_URL . 'assets/img/info.svg'); ?>"
-								alt="<?php echo esc_attr__('Size help', 'wp-top-info-bar'); ?>"
-								class="wp-top-info-bar-tooltip__icon"
-							/>
-							<span class="wp-top-info-bar-tooltip__content" role="tooltip">
-								<?php echo esc_html__('Use a standard CSS size value, for example: 40px, 2rem or 10%. This value sets the image width.', 'wp-top-info-bar'); ?>
-							</span>
-						</span>
-					</label>
-					<?php
-					echo $this->get_responsive_inputs_markup(
-						$field_name,
-						'size',
-						array(
-							'desktop' => $size,
-							'tablet'  => $size_tablet,
-							'mobile'  => $size_mobile,
-						),
-						array(
-							'desktop' => '40px',
-							'tablet'  => '',
-							'mobile'  => '',
-						)
-					);
-					?>
+				<div class="wp-top-info-bar-image-row__actions">
+					<button type="button" class="button wp-top-info-bar-image-row__replace" data-select-image data-replace-image><?php echo esc_html($image_url ? __('Replace image', 'wp-top-info-bar') : __('Choose image', 'wp-top-info-bar')); ?></button>
+					<button type="button" class="button-link-delete" data-remove-image-row><?php esc_html_e('Remove', 'wp-top-info-bar'); ?></button>
 				</div>
-
-				<div class="wp-top-info-bar-image-row__field">
-					<label class="wp-top-info-bar-image-row__label-with-tooltip">
-						<span><?php echo esc_html__('Margin', 'wp-top-info-bar'); ?></span>
-						<span
-							class="wp-top-info-bar-tooltip"
-							tabindex="0"
-							aria-label="<?php echo esc_attr__('Use a standard CSS margin value, for example: 0 12px 0 0. For a left image, you can use: 0 auto 0 0. For a right image, you can use: 0 0 0 auto.', 'wp-top-info-bar'); ?>"
-						>
-							<img
-								src="<?php echo esc_url(WP_TOP_INFO_BAR_URL . 'assets/img/info.svg'); ?>"
-								alt="<?php echo esc_attr__('Margin help', 'wp-top-info-bar'); ?>"
-								class="wp-top-info-bar-tooltip__icon"
-							/>
-							<span class="wp-top-info-bar-tooltip__content" role="tooltip">
-								<?php echo esc_html__('Use a standard CSS margin value, for example: 0 12px 0 0. For a left image, you can use: 0 auto 0 0. For a right image, you can use: 0 0 0 auto.', 'wp-top-info-bar'); ?>
-							</span>
-						</span>
-					</label>
-					<?php
-					echo $this->get_responsive_inputs_markup(
-						$field_name,
-						'margin',
-						array(
-							'desktop' => $margin,
-							'tablet'  => $margin_tablet,
-							'mobile'  => $margin_mobile,
-						),
-						array(
-							'desktop' => '0 12px 0 0',
-							'tablet'  => '',
-							'mobile'  => '',
-						)
-					);
+				</div>
+				<div class="wp-top-info-bar-image-row__field wp-top-info-bar-image-size-field">
+					<?php $this->image_device_heading(__('Size (px)', 'wp-top-info-bar'), __('Image width in pixels. Enter a number without px. The height follows the image proportions. Empty tablet/mobile fields inherit from the larger screen.', 'wp-top-info-bar')); ?>
+					<?php foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) :
+						$value = (string) ($image['size' . $suffix] ?? '');
+						$number = preg_match('/^(-?(?:\d+(?:\.\d+)?|\.\d+))(?:px)?$/i', trim($value), $match) ? (string) (float) $match[1] : '';
 					?>
+					<div class="wp-top-info-bar-admin__responsive-device" data-device="<?php echo esc_attr($device); ?>"<?php echo 'desktop' === $device ? '' : ' hidden'; ?>>
+						<input type="number" min="0" step="any" class="regular-text" data-image-size value="<?php echo esc_attr($number); ?>" aria-label="<?php echo esc_attr(sprintf(__('Image size (px): %s', 'wp-top-info-bar'), $device)); ?>">
+						<input type="hidden" class="wp-top-info-bar-image-size-value" name="<?php echo esc_attr($field_name . '[size' . $suffix . ']'); ?>" value="<?php echo esc_attr($value); ?>">
+					</div>
+					<?php endforeach; ?>
+				</div>
+				<div class="wp-top-info-bar-image-row__field wp-top-info-bar-image-margin-field">
+					<?php $this->image_device_heading(__('Margin', 'wp-top-info-bar'), __('Outer spacing in pixels: Top, Right, Bottom and Left. Enter a number without px. Negative values are allowed. Empty tablet/mobile sides inherit from the larger screen; use 0 to remove a spacing.', 'wp-top-info-bar')); ?>
+					<?php $this->spacing_fields('margin', $image, $field_name); ?>
 				</div>
 
 				<div class="wp-top-info-bar-image-row__field">
@@ -680,12 +645,6 @@ final class WP_Top_Info_Bar_Admin {
 					</select>
 				</div>
 
-				<div class="wp-top-info-bar-image-row__field wp-top-info-bar-image-row__field--action">
-					<label>&nbsp;</label>
-					<button type="button" class="button-link-delete" data-remove-image-row>
-						<?php echo esc_html__('Remove', 'wp-top-info-bar'); ?>
-					</button>
-				</div>
 			</div>
 		</div>
 		<?php
@@ -697,6 +656,14 @@ final class WP_Top_Info_Bar_Admin {
 			esc_html($label),
 			$this->get_tooltip_markup($tooltip, $label)
 		);
+	}
+
+	private function image_device_heading(string $label, string $help): void {
+		echo '<div class="wp-top-info-bar-image-row__responsive-heading">' . $this->get_settings_field_title_markup($label, $help) . '<span class="wp-top-info-bar-admin__devices" role="group" aria-label="' . esc_attr($label . ' - ' . __('Device', 'wp-top-info-bar')) . '">';
+		foreach (array('desktop' => array(__('Desktop', 'wp-top-info-bar'), 'dashicons-desktop'), 'tablet' => array(__('Tablet', 'wp-top-info-bar'), 'dashicons-tablet'), 'mobile' => array(__('Mobile', 'wp-top-info-bar'), 'dashicons-smartphone')) as $device => $meta) {
+			echo '<button type="button" class="wp-top-info-bar-admin__device" data-device="' . esc_attr($device) . '" aria-label="' . esc_attr($meta[0]) . '" title="' . esc_attr($meta[0]) . '" aria-pressed="' . ('desktop' === $device ? 'true' : 'false') . '"><span class="dashicons ' . esc_attr($meta[1]) . '" aria-hidden="true"></span></button>';
+		}
+		echo '</span></div>';
 	}
 
 	private function get_tooltip_markup(string $tooltip, string $alt_text): string {
