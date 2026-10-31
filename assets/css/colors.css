@@ -1,0 +1,132 @@
+/* Pickr control and classic popup, shared appearance with WP Swiper. */
+.wp-top-info-bar-color-pick {
+	display: inline-flex;
+	vertical-align: middle;
+}
+
+.wp-top-info-bar-color-pick[hidden] {
+	display: none;
+}
+
+.wp-top-info-bar-color-pick__swatch {
+	display: block;
+	width: 64px;
+	height: 40px;
+	padding: 3px;
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+	background: #fff;
+	cursor: pointer;
+}
+
+.wp-top-info-bar-color-pick__swatch:hover {
+	border-color: #2c3338;
+}
+
+.wp-top-info-bar-color-pick__swatch:focus-visible,
+.wp-top-info-bar-color-pick__swatch[aria-expanded="true"] {
+	border-color: var(--wp-admin-theme-color, #2271b1);
+	outline: none;
+	box-shadow: 0 0 0 1px var(--wp-admin-theme-color, #2271b1);
+}
+
+.wp-top-info-bar-color-pick__chip {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border-radius: 2px;
+	background: repeating-conic-gradient(#dcdcde 0% 25%, #fff 0% 50%) 0 0 / 10px 10px;
+}
+
+.wp-top-info-bar-color-pick--compact .wp-top-info-bar-color-pick__swatch {
+	width: 36px;
+	height: 24px;
+	padding: 2px;
+}
+
+.wp-top-info-bar-modal__color .wp-top-info-bar-color-pick__swatch {
+	height: 30px;
+}
+
+/* The picker (Pickr's classic theme, in the body): over the Slide info
+   window (z-index 100050), under the editor's link window (100105). */
+.pcr-app.wp-top-info-bar-pcr {
+	z-index: 100060;
+}
+
+/* Squarer than Pickr's own (28.5em wide, the palette 8em tall): narrower,
+   the palette taller; the color's code on a row of its own, taller too. */
+.pcr-app.wp-top-info-bar-pcr[data-theme="classic"] {
+	width: 20em;
+}
+
+.pcr-app.wp-top-info-bar-pcr[data-theme="classic"] .pcr-selection .pcr-color-palette {
+	height: 11em;
+}
+
+.pcr-app.wp-top-info-bar-pcr[data-theme="classic"] .pcr-selection .pcr-color-opacity .pcr-slider {
+	background-image: linear-gradient(to bottom, transparent, var(--wtib-opacity-color, #000)), conic-gradient(#fff 25%, #808080 0 50%, #fff 0 75%, #808080 0);
+	background-size: 100%, 8px 8px;
+}
+
+.pcr-app.wp-top-info-bar-pcr .pcr-interaction .pcr-result {
+	flex: 1 0 100%;
+	height: 2.6em;
+	font-size: 0.85em;
+}
+
+.pcr-app.wp-top-info-bar-pcr .pcr-interaction .pcr-type,
+.pcr-app.wp-top-info-bar-pcr .pcr-interaction .pcr-cancel,
+.pcr-app.wp-top-info-bar-pcr .pcr-interaction .pcr-clear {
+	flex: 1 1 auto;
+}
+
+/* Closing (it fades out): a click there goes through, it changes no color. */
+.pcr-app.wp-top-info-bar-pcr:not(.visible) {
+	pointer-events: none;
+}
+
+/* Cancel grey, as the format buttons; Default red (Pickr's Clear). */
+.pcr-app.wp-top-info-bar-pcr .pcr-interaction .pcr-cancel {
+	background: #f1f3f4;
+	color: #75797e;
+}
+
+.pcr-app.wp-top-info-bar-pcr .pcr-interaction .pcr-cancel:hover {
+	filter: brightness(0.92);
+}
+
+/* WordPress's own input styles off Pickr's: its sizes as its theme has them. */
+.pcr-app.wp-top-info-bar-pcr .pcr-interaction input {
+	min-height: 0;
+	box-shadow: none;
+	line-height: normal;
+}
+
+.pcr-app.wp-top-info-bar-pcr .pcr-interaction .pcr-result {
+	padding: 0 0.6em;
+	border: 0;
+	border-radius: 0.15em;
+	background: #f1f3f4;
+	color: #75797e;
+}
+
+.pcr-app.wp-top-info-bar-pcr .pcr-interaction .pcr-result:focus {
+	box-shadow: 0 0 0 2px #2271b1;
+}
+
+/* Scope field focus colors to this plugin, independent of the admin theme. */
+:is(#wp-top-info-bar-settings, #wp-top-info-bar-shortcode) :is(
+	input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+	select,
+	textarea
+):is(:focus, :active):not(:disabled) {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	outline: 2px solid transparent;
+}
+
+.pcr-app.wp-top-info-bar-pcr .pcr-interaction .pcr-type.active {
+	background: #2271b1;
+}
+

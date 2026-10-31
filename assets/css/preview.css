@@ -1,0 +1,332 @@
+
+.wp-top-info-bar-admin__preview {
+	position: sticky;
+	top: 46px;
+	padding: 12px 16px 16px;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	background: #f6f7f7;
+}
+
+/* Preview, matching WP Maps Embed: bar, note and the frame
+   in its device, scaled to the column (admin.js fitPreview()). */
+.wp-top-info-bar-preview__bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+	margin-bottom: 12px;
+}
+
+.wp-top-info-bar-preview__title {
+	font-weight: 600;
+}
+
+/* Turn the device: an icon button right of the title, as tall as the bar's
+   buttons; greyed for Desktop, pressed while the tablet or phone is turned. */
+.wp-top-info-bar-admin .wp-top-info-bar-preview__rotate {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 32px;
+	min-height: 32px;
+	padding: 0 6px;
+	line-height: 1;
+}
+
+.wp-top-info-bar-preview__rotate-icon {
+	display: block;
+	width: 22px;
+	height: auto;
+}
+
+.wp-top-info-bar-admin .wp-top-info-bar-preview__rotate[aria-pressed="true"] {
+	border-color: #2271b1;
+	background: #2271b1;
+	color: #fff;
+}
+
+/* "Show the cover again": right of the turn button, the rest on the right. */
+.wp-top-info-bar-admin .wp-top-info-bar-preview__reset {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 32px;
+	margin-right: auto;
+	padding: 0 12px;
+	line-height: 1;
+}
+
+/* WordPress sets button icons to line-height 1.9, which drops them below the label. */
+.wp-top-info-bar-admin .wp-top-info-bar-preview__reset .dashicons,
+.wp-top-info-bar-admin .wp-top-info-bar-preview__update .dashicons {
+	width: 16px;
+	height: 16px;
+	font-size: 16px;
+	line-height: 1;
+	vertical-align: middle;
+	color: inherit;
+}
+
+/* Desktop / Tablet / Mobile with names, the one chosen outlined. */
+.wp-top-info-bar-preview__devices {
+	display: flex;
+	gap: 4px;
+	padding: 3px;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	background: #fff;
+}
+
+.wp-top-info-bar-preview__device-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	padding: 4px 10px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	background: none;
+	color: #50575e;
+	font: inherit;
+	cursor: pointer;
+}
+
+.wp-top-info-bar-preview__device-btn:hover {
+	color: #1d2327;
+}
+
+.wp-top-info-bar-preview__device-btn[aria-pressed="true"] {
+	border-color: #2271b1;
+	background: #fff;
+	color: #2271b1;
+	font-weight: 600;
+}
+
+.wp-top-info-bar-preview__device-btn:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 1px;
+}
+
+.wp-top-info-bar-preview__device-btn .dashicons {
+	width: 16px;
+	height: 16px;
+	font-size: 16px;
+}
+
+/* Icon and label centred on one line, as tall as the device buttons. */
+.wp-top-info-bar-admin .wp-top-info-bar-preview__update {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 32px;
+	padding: 0 12px;
+	line-height: 1;
+}
+
+/* Preview actions match the route copy button in every state. */
+.wp-top-info-bar-admin .button:is(.wp-top-info-bar-preview__update, .wp-top-info-bar-preview__reset),
+.wp-top-info-bar-admin .button:is(.wp-top-info-bar-preview__update, .wp-top-info-bar-preview__reset):is(:hover, :focus, :active) {
+	border-color: #2271b1;
+	background: transparent;
+	color: #2271b1;
+	box-shadow: none;
+}
+
+.wp-top-info-bar-admin .button:is(.wp-top-info-bar-preview__update, .wp-top-info-bar-preview__reset):focus {
+	box-shadow: 0 0 0 1px #2271b1;
+}
+
+.wp-top-info-bar-admin .button:is(.wp-top-info-bar-preview__update, .wp-top-info-bar-preview__reset):disabled {
+	border-color: #2271b1 !important;
+	background: transparent !important;
+	color: #2271b1 !important;
+	box-shadow: none;
+	opacity: 0.45;
+	cursor: default;
+}
+
+/* As in WP Swiper: a filled Update button means the preview is outdated. */
+.wp-top-info-bar-admin .button.wp-top-info-bar-preview__update.is-stale,
+.wp-top-info-bar-admin .button.wp-top-info-bar-preview__update.is-stale:is(:hover, :focus, :active) {
+	border-color: #2271b1;
+	background: #2271b1;
+	color: #fff;
+}
+
+/* The note under the bar (a device turned sideways). */
+.wp-top-info-bar-admin .wp-top-info-bar-preview__hint {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin: -6px 0 12px;
+}
+
+.wp-top-info-bar-admin .wp-top-info-bar-preview__hint[hidden] {
+	display: none;
+}
+
+.wp-top-info-bar-preview__hint .dashicons {
+	width: 16px;
+	height: 16px;
+	font-size: 16px;
+}
+
+.wp-top-info-bar-preview__stage {
+	position: relative;
+	overflow: hidden;
+}
+
+/* While the device turns (admin.js): all of it seen, past the stage too. */
+.wp-top-info-bar-preview__stage.is-turning {
+	z-index: 2;
+	overflow: visible;
+}
+
+/* Drawn at the device's size, scaled down to the column (admin.js). */
+.wp-top-info-bar-preview__frame {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border: 0;
+	background: #fff;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+	transform-origin: 0 0;
+}
+
+/* In the device: the frame in its screen (its corners, admin.js), the drawing
+   over it, its camera or bar over the page as on a real one; clicks go through. */
+.wp-top-info-bar-preview--device .wp-top-info-bar-preview__frame {
+	box-shadow: none;
+}
+
+.wp-top-info-bar-preview__device {
+	position: absolute;
+	top: 0;
+	z-index: 1;
+	display: block;
+	max-width: none;
+	pointer-events: none;
+	user-select: none;
+	/* Turned sideways round this corner (admin.js). */
+	transform-origin: 0 0;
+}
+
+.wp-top-info-bar-preview__device[hidden] {
+	display: none;
+}
+
+.wp-top-info-bar-preview > .description {
+	margin: 10px 0 0;
+}
+
+.wp-top-info-bar-settings{container-type:inline-size}
+.wp-top-info-bar-admin{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,7fr) minmax(0,10fr);gap:16px;align-items:start;--wp-admin-theme-color:#2271b1;accent-color:#2271b1}
+.wp-top-info-bar-admin__settings{min-width:0;border:1px solid #dcdcde;border-radius:4px;padding:16px;background:#fff}
+.wp-top-info-bar-admin__settings>h2{margin-top:0}
+.wp-top-info-bar-admin__settings .form-table{margin-top:0}
+.wp-top-info-bar-admin__settings .form-table tbody{display:block}
+.wp-top-info-bar-admin__settings .form-table tr{display:block;padding:12px;margin-bottom:12px;border-radius:4px;background:#f0f0f1}
+.wp-top-info-bar-admin__settings .form-table th,.wp-top-info-bar-admin__settings .form-table td{display:block;width:auto;padding:0}
+.wp-top-info-bar-admin__settings .form-table th{margin-bottom:8px;text-align:left}
+.wp-top-info-bar-admin__settings .form-table td{margin-bottom:0}
+.wp-top-info-bar-admin__settings textarea,.wp-top-info-bar-admin__settings input.regular-text,.wp-top-info-bar-admin__settings select{max-width:100%;box-sizing:border-box}
+.wp-top-info-bar-admin__settings .wp-top-info-bar-responsive-inputs__item{flex:1 1 100px}
+.wp-top-info-bar-admin__settings .wp-top-info-bar-responsive-inputs__item .regular-text{width:100%;min-width:0;max-width:none}
+.wp-top-info-bar-admin__settings .wp-top-info-bar-image-row__grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.wp-top-info-bar-admin__settings .description{font-size:12px}
+.wp-top-info-bar-preview__devices{margin-left:auto}
+.wp-top-info-bar-admin .wp-top-info-bar-preview__dev{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;line-height:1;border-color:#2271b1;background:transparent;color:#2271b1}
+.wp-top-info-bar-admin .wp-top-info-bar-preview__dev .dashicons{display:block;flex:0 0 16px;width:16px;height:16px;margin:0;padding:0;font-size:16px;line-height:16px;vertical-align:middle;color:inherit}
+.wp-top-info-bar-preview__dev>span:not(.dashicons){display:block;line-height:16px}
+.wp-top-info-bar-admin .wp-top-info-bar-preview__dev[aria-pressed="true"]{background:#2271b1;border-color:#2271b1;color:#fff}
+.wp-top-info-bar-admin .wp-top-info-bar-preview__dev:disabled{opacity:.45;cursor:default}
+.wp-top-info-bar-admin .wp-top-info-bar-preview__dev:focus{box-shadow:0 0 0 1px #2271b1}
+.wp-top-info-bar-admin__settings .wp-editor-wrap{max-width:100%;min-width:0}
+.wp-top-info-bar-admin__settings .mce-toolbar .mce-btn-group .mce-btn{margin:0 1px}
+.wp-top-info-bar-admin__settings .mce-toolbar .mce-btn-group>div{white-space:normal}
+.wp-top-info-bar-preview__error{color:#b32d2e}
+.wp-top-info-bar-preview__error[hidden]{display:none}
+@container (max-width:1000px){.wp-top-info-bar-admin{grid-template-columns:minmax(0,3fr) minmax(0,7fr)}.wp-top-info-bar-admin__preview{position:static;grid-column:1 / -1}}
+@container (max-width:560px){.wp-top-info-bar-admin__settings .wp-top-info-bar-image-row__grid{grid-template-columns:minmax(0,1fr)}}
+
+
+.wp-top-info-bar-admin__menu {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.wp-top-info-bar-admin__menu-item {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 10px 12px;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	background: #fff;
+	color: #1d2327;
+	font: inherit;
+	font-weight: 600;
+	text-align: left;
+	cursor: pointer;
+}
+
+.wp-top-info-bar-admin__menu-item .dashicons {
+	color: #646970;
+}
+
+/* Chevron at the end: the page opens to the right. */
+.wp-top-info-bar-admin__menu-item::after {
+	content: "\f345";
+	margin-left: auto;
+	font: normal 16px/1 dashicons;
+	color: #a7aaad;
+}
+
+.wp-top-info-bar-admin__menu-item:hover {
+	border-color: #2271b1;
+	color: #2271b1;
+}
+
+.wp-top-info-bar-admin__menu-item[aria-current="true"] {
+	border-color: #2271b1;
+	background: #f0f6fc;
+	color: #2271b1;
+	box-shadow: inset 3px 0 0 #2271b1;
+}
+
+.wp-top-info-bar-admin__menu-item[aria-current="true"] .dashicons,
+.wp-top-info-bar-admin__menu-item[aria-current="true"]::after {
+	color: #2271b1;
+}
+
+.wp-top-info-bar-admin__menu-item:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 1px;
+}
+
+
+.wp-top-info-bar-admin__page{min-width:0;margin:0;padding:0;border:0}
+.wp-top-info-bar-admin__page[hidden]{display:none}
+.wp-top-info-bar-admin__page>legend{font-size:14px;font-weight:600;margin-bottom:12px;padding:0}
+.wp-top-info-bar-admin__text-block{padding:12px;margin-bottom:12px;border-radius:4px;background:#f0f0f1;min-width:0}
+.wp-top-info-bar-admin__text-block .form-table tbody{display:grid;grid-template-columns:minmax(0,1fr) 76px;gap:12px 16px}
+.wp-top-info-bar-admin__text-block .form-table tr{padding:0;margin:0;background:none;min-width:0}
+.wp-top-info-bar-admin__text-block .wp-top-info-bar-field-message{grid-column:1 / -1}
+.wp-top-info-bar-admin__text-block .form-table th{min-height:26px;box-sizing:border-box}
+.wp-top-info-bar-admin__text-block .wp-top-info-bar-field-text_color th{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.wp-top-info-bar-admin__text-block .wp-top-info-bar-field-text_color .wp-top-info-bar-tooltip{display:none}
+.wp-top-info-bar-admin__text-block .wp-top-info-bar-admin__device-input{height:40px}
+.wp-top-info-bar-admin__spacing-block{padding:12px;margin-bottom:12px;border-radius:4px;background:#f0f0f1;min-width:0}
+.wp-top-info-bar-admin__settings .wp-top-info-bar-admin__spacing-block tr{padding:0;background:none}
+.wp-top-info-bar-admin__spacing-block tr:last-child{margin-bottom:0}
+.wp-top-info-bar-admin__settings .wp-top-info-bar-admin__spacing-block th{display:flex;align-items:center;gap:6px}
+.wp-top-info-bar-admin__spacing-inputs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.wp-top-info-bar-admin__spacing-inputs[hidden]{display:none}
+.wp-top-info-bar-admin__spacing-inputs label{min-width:0;font-size:12px;color:#646970}
+.wp-top-info-bar-admin__spacing-inputs label>span{display:block;margin-bottom:4px}
+.wp-top-info-bar-admin__settings .wp-top-info-bar-admin__spacing-inputs input.regular-text{width:100%;max-width:100%;min-width:0;padding:0 6px}
+@container (max-width:560px){.wp-top-info-bar-admin{grid-template-columns:minmax(0,1fr)}}

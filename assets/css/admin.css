@@ -314,3 +314,122 @@
 .is-disabled input[readonly] {
 	cursor: not-allowed;
 }
+
+.wp-top-info-bar-admin__device {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 0;
+	border-radius: 3px;
+	background: none;
+	color: #a7aaad;
+	cursor: pointer;
+}
+
+.wp-top-info-bar-admin__device .dashicons {
+	width: 18px;
+	height: 18px;
+	font-size: 18px;
+}
+
+.wp-top-info-bar-admin__device:hover {
+	color: #50575e;
+}
+
+.wp-top-info-bar-admin__device.is-active {
+	color: #2271b1;
+}
+
+/* Tablet / mobile has a value of its own (not inherited). */
+.wp-top-info-bar-admin__device.has-value::after {
+	content: "";
+	position: absolute;
+	top: 3px;
+	right: 3px;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #00a32a;
+}
+
+.wp-top-info-bar-admin__device:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 0;
+}
+
+.wp-top-info-bar-admin__devices{display:inline-flex;gap:2px;margin-left:auto}
+.wp-top-info-bar-admin__settings .form-table .wp-top-info-bar-font-size-row th{display:flex;align-items:center;gap:6px}
+.wp-top-info-bar-admin__settings .wp-top-info-bar-admin__device-input{width:100%;max-width:100%}
+.wp-top-info-bar-admin__device-input[hidden]{display:none!important}
+
+.wp-top-info-bar-admin__switch {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.wp-top-info-bar-admin__switch label {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	font-weight: 600;
+}
+
+.wp-top-info-bar-admin__switch input[type="checkbox"] {
+	position: relative;
+	flex: 0 0 auto;
+	width: 36px;
+	height: 20px;
+	margin: 0;
+	border: 0;
+	border-radius: 10px;
+	background: #c3c4c7;
+	box-shadow: none;
+	appearance: none;
+	transition: background-color 0.15s;
+	cursor: pointer;
+}
+
+/* The knob; also overrides WordPress's tick on checked boxes. */
+.wp-top-info-bar-admin__switch input[type="checkbox"]::before,
+.wp-top-info-bar-admin__switch input[type="checkbox"]:checked::before {
+	content: "";
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	float: none;
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+	transition: transform 0.15s;
+}
+
+.wp-top-info-bar-admin__switch input[type="checkbox"]:checked {
+	background: #2271b1;
+}
+
+.wp-top-info-bar-admin__switch input[type="checkbox"]:checked::before {
+	transform: translateX(16px);
+}
+
+.wp-top-info-bar-admin__switch input[type="checkbox"]:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wp-top-info-bar-admin__switch input[type="checkbox"],
+	.wp-top-info-bar-admin__switch input[type="checkbox"]::before {
+		transition: none;
+	}
+}
+
+.wp-top-info-bar-admin__enable{padding:8px 0;margin-bottom:6px}

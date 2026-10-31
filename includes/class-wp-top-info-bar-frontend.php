@@ -12,14 +12,17 @@ final class WP_Top_Info_Bar_Frontend {
 
 		add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
 		add_action('wp_body_open', array($this, 'render_info_bar'));
+		add_shortcode('wp_top_info_bar', array($this, 'shortcode'));
 	}
 
 	public function enqueue_frontend_assets(): void {
 		$settings = $this->settings->get_settings();
 		$images = is_array($settings['images']) ? $settings['images'] : array();
-		$has_message = '' !== trim($settings['message']);
+		$has_message = '' !== trim(wp_strip_all_tags($settings['message']));
 
-		if (empty($settings['enabled']) || (! $has_message && empty($images))) {
+		global $post;
+		$has_shortcode = $post && has_shortcode($post->post_content, 'wp_top_info_bar');
+		if (! $has_shortcode && (empty($settings['enabled']) || (! $has_message && empty($images)))) {
 			return;
 		}
 
@@ -27,14 +30,37 @@ final class WP_Top_Info_Bar_Frontend {
 			'wp-top-info-bar-frontend',
 			WP_TOP_INFO_BAR_URL . 'assets/css/frontend.css',
 			array(),
-			WP_TOP_INFO_BAR_VERSION
+			(string) filemtime(WP_TOP_INFO_BAR_PATH . 'assets/css/frontend.css')
 		);
 	}
 
 	public function render_info_bar(): void {
 		$settings = $this->settings->get_settings();
+		$this->render_settings($settings);
+	}
+
+	public function shortcode($atts): string {
+		$atts = shortcode_atts(array('id' => 0), $atts, 'wp_top_info_bar');
+		$id = absint($atts['id']);
+		$post = $id ? get_post($id) : null;
+		if (! $post || WP_Top_Info_Bar_Settings::POST_TYPE !== $post->post_type || 'publish' !== $post->post_status || '' !== $post->post_password) {
+			return '';
+		}
+		$settings = (new WP_Top_Info_Bar_Settings($id))->get_settings();
+		if (empty($settings['enabled'])) {
+			return '';
+		}
+		wp_enqueue_style('wp-top-info-bar-frontend', WP_TOP_INFO_BAR_URL . 'assets/css/frontend.css', array(), (string) filemtime(WP_TOP_INFO_BAR_PATH . 'assets/css/frontend.css'));
+		ob_start();
+		$this->render_settings($settings);
+		return (string) ob_get_clean();
+	}
+
+	/** Shared rendering for the site and the unsaved settings preview. */
+	public function render_settings(array $settings): void {
 		$images = is_array($settings['images']) ? $settings['images'] : array();
-		$has_message = '' !== trim($settings['message']);
+		$message = (new WP_Top_Info_Bar_Sanitizer())->sanitize_message($settings['message']);
+		$has_message = '' !== $message;
 		$left_images = $this->filter_images_by_position($images, 'left');
 		$right_images = $this->filter_images_by_position($images, 'right');
 		$center_top_images = $this->filter_images_by_position($images, 'center-top');
@@ -72,7 +98,7 @@ final class WP_Top_Info_Bar_Frontend {
 		}
 
 		if ($has_message) {
-			echo '<div class="' . esc_attr($text_classes) . '" style="' . esc_attr($text_style_attribute) . '">' . nl2br(esc_html($settings['message'])) . '</div>';
+			echo '<div class="' . esc_attr($text_classes) . '" style="' . esc_attr($text_style_attribute) . '">' . wpautop($message) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- allowlisted above.
 		}
 
 		if (! empty($center_bottom_images)) {

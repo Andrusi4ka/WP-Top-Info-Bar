@@ -7,18 +7,29 @@ if (! defined('ABSPATH')) {
 final class WP_Top_Info_Bar_Admin {
 	private WP_Top_Info_Bar_Settings $settings;
 	private WP_Top_Info_Bar_Sanitizer $sanitizer;
+	private const SAVE_NONCE = 'wp_top_info_bar_save';
 
 	public function __construct(WP_Top_Info_Bar_Settings $settings, WP_Top_Info_Bar_Sanitizer $sanitizer) {
 		$this->settings = $settings;
 		$this->sanitizer = $sanitizer;
 
 		add_action('admin_menu', array($this, 'register_admin_menu'));
+		add_action('init', array($this, 'register_post_type'));
+		add_action('admin_init', array($this, 'migrate_settings'));
 		add_action('admin_init', array($this, 'register_settings'));
+		add_action('add_meta_boxes_' . WP_Top_Info_Bar_Settings::POST_TYPE, array($this, 'add_meta_boxes'));
+		add_action('save_post_' . WP_Top_Info_Bar_Settings::POST_TYPE, array($this, 'save'), 10, 2);
 		add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
+		add_filter('parent_file', array($this, 'parent_menu'));
+	}
+
+	public function parent_menu($parent) {
+		$screen = get_current_screen();
+		return $screen && WP_Top_Info_Bar_Settings::POST_TYPE === $screen->post_type ? WP_Top_Info_Bar_Settings::MENU_SLUG : $parent;
 	}
 
 	public function register_admin_menu(): void {
-		add_menu_page(
+		$hook = add_menu_page(
 			__('Top Info Bar', 'wp-top-info-bar'),
 			__('Top Info Bar', 'wp-top-info-bar'),
 			'manage_options',
@@ -27,44 +38,106 @@ final class WP_Top_Info_Bar_Admin {
 			'dashicons-megaphone',
 			81
 		);
+		add_action('load-' . $hook, array($this, 'open_editor'));
+	}
+
+	public function register_post_type(): void {
+		register_post_type(WP_Top_Info_Bar_Settings::POST_TYPE, array(
+			'labels' => array(
+				'name' => __('Top Info Bar', 'wp-top-info-bar'),
+				'singular_name' => __('Top Info Bar', 'wp-top-info-bar'),
+				'edit_item' => __('Edit Top Info Bar', 'wp-top-info-bar'),
+				'add_new_item' => __('Add Top Info Bar', 'wp-top-info-bar'),
+			),
+			'public' => false, 'show_ui' => true, 'show_in_menu' => false,
+			'show_in_rest' => false, 'supports' => array('title'),
+			'capabilities' => array(
+				'edit_post' => 'manage_options', 'read_post' => 'manage_options', 'delete_post' => 'manage_options',
+				'edit_posts' => 'manage_options', 'edit_others_posts' => 'manage_options', 'publish_posts' => 'manage_options',
+				'read_private_posts' => 'manage_options', 'delete_posts' => 'manage_options', 'delete_private_posts' => 'manage_options',
+				'delete_published_posts' => 'manage_options', 'delete_others_posts' => 'manage_options',
+				'edit_private_posts' => 'manage_options', 'edit_published_posts' => 'manage_options', 'create_posts' => 'manage_options',
+			),
+		));
+	}
+
+	/** Copy the existing global bar once; retain the original option as a backup. */
+	public function migrate_settings(): void {
+		if (! current_user_can('manage_options') || get_option(WP_Top_Info_Bar_Settings::GLOBAL_POST_OPTION, 0)) {
+			return;
+		}
+		$id = wp_insert_post(array('post_type' => WP_Top_Info_Bar_Settings::POST_TYPE, 'post_title' => __('Top Info Bar', 'wp-top-info-bar'), 'post_status' => 'publish'), true);
+		if (is_wp_error($id) || ! $id) {
+			return;
+		}
+		update_post_meta($id, WP_Top_Info_Bar_Settings::META_KEY, wp_slash($this->sanitizer->sanitize_settings($this->settings->get_settings())));
+		update_option(WP_Top_Info_Bar_Settings::GLOBAL_POST_OPTION, $id, false);
+	}
+
+	public function open_editor(): void {
+		$id = absint(get_option(WP_Top_Info_Bar_Settings::GLOBAL_POST_OPTION, 0));
+		$post = $id ? get_post($id) : null;
+		$url = $post && WP_Top_Info_Bar_Settings::POST_TYPE === $post->post_type && 'trash' !== $post->post_status
+			? admin_url('post.php?post=' . $id . '&action=edit')
+			: admin_url('edit.php?post_type=' . WP_Top_Info_Bar_Settings::POST_TYPE);
+		wp_safe_redirect($url);
+		exit;
+	}
+
+	public function add_meta_boxes(): void {
+		add_meta_box('wp-top-info-bar-settings', __('Bar settings', 'wp-top-info-bar'), array($this, 'render_settings_box'), null, 'normal', 'high');
+		add_meta_box('wp-top-info-bar-shortcode', __('Shortcode', 'wp-top-info-bar'), array($this, 'render_shortcode_box'), null, 'side', 'high');
+	}
+
+	public function render_shortcode_box($post): void {
+		if ('auto-draft' === $post->post_status) {
+			echo '<p>' . esc_html__('Save the bar to get its shortcode.', 'wp-top-info-bar') . '</p>';
+			return;
+		}
+		printf('<input type="text" class="widefat wp-top-info-bar-shortcode" readonly value="%s" onclick="this.select()">', esc_attr('[wp_top_info_bar id="' . $post->ID . '"]'));
+		echo '<p class="description">' . esc_html__('Paste it into any page to show the bar there.', 'wp-top-info-bar') . '</p>';
+	}
+
+	public function save($post_id, $post): void {
+		if ((defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) || wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
+			return;
+		}
+		if (WP_Top_Info_Bar_Settings::POST_TYPE !== $post->post_type || ! current_user_can('manage_options') || ! current_user_can('edit_post', $post_id)) {
+			return;
+		}
+		$nonce = $_POST[self::SAVE_NONCE . '_nonce'] ?? '';
+		if (! is_string($nonce) || ! wp_verify_nonce($nonce, self::SAVE_NONCE) || ! isset($_POST[WP_Top_Info_Bar_Settings::OPTION_NAME])) {
+			return;
+		}
+		$values = $this->sanitizer->sanitize_settings(wp_unslash($_POST[WP_Top_Info_Bar_Settings::OPTION_NAME]));
+		update_post_meta($post_id, WP_Top_Info_Bar_Settings::META_KEY, wp_slash($values));
 	}
 
 	public function register_settings(): void {
-		register_setting(
-			WP_Top_Info_Bar_Settings::SETTINGS_GROUP,
-			WP_Top_Info_Bar_Settings::OPTION_NAME,
-			array($this->sanitizer, 'sanitize_settings')
-		);
-
-		add_settings_section(
-			WP_Top_Info_Bar_Settings::SETTINGS_SECTION,
-			__('Bar Settings', 'wp-top-info-bar'),
-			function (): void {
-				echo '<p>' . esc_html__('Configure the top information bar shown on the frontend.', 'wp-top-info-bar') . '</p>';
-			},
-			WP_Top_Info_Bar_Settings::MENU_SLUG
-		);
+		foreach (self::pages() as $page => $meta) {
+			add_settings_section(WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_' . $page, '', '__return_false', WP_Top_Info_Bar_Settings::MENU_SLUG);
+		}
 
 		$fields = array(
-			'enabled'          => array(
-				'label'    => __('Enable bar', 'wp-top-info-bar'),
-				'callback' => 'render_enabled_field',
-				'tooltip'  => __('Turn the top bar on or off for the frontend. Enable it when you want the bar to appear on the site.', 'wp-top-info-bar'),
-			),
 			'message'          => array(
 				'label'    => __('Bar text', 'wp-top-info-bar'),
 				'callback' => 'render_message_field',
 				'tooltip'  => __('Enter the message shown in the bar. Example: Free shipping on orders over $50.', 'wp-top-info-bar'),
 			),
+			'font_size'        => array(
+				'label'    => __('Text size', 'wp-top-info-bar'),
+				'callback' => 'render_font_size_field',
+				'tooltip'  => __('Use a CSS font-size value. Examples: 14px, 1rem, clamp(14px, 2vw, 18px). Empty on tablet or mobile: inherit from the larger screen.', 'wp-top-info-bar'),
+			),
+			'text_color'       => array(
+				'label'    => __('Text Color', 'wp-top-info-bar'),
+				'callback' => 'render_text_color_field',
+				'tooltip'  => __('Choose the text color shown inside the bar. Example: #ffffff for white text.', 'wp-top-info-bar'),
+			),
 			'background_color' => array(
 				'label'    => __('Background color', 'wp-top-info-bar'),
 				'callback' => 'render_background_color_field',
 				'tooltip'  => __('Choose the bar background color. Example: #1f2937 for a dark blue-gray background.', 'wp-top-info-bar'),
-			),
-			'text_color'       => array(
-				'label'    => __('Text color', 'wp-top-info-bar'),
-				'callback' => 'render_text_color_field',
-				'tooltip'  => __('Choose the text color shown inside the bar. Example: #ffffff for white text.', 'wp-top-info-bar'),
 			),
 			'animation'        => array(
 				'label'    => __('Animation', 'wp-top-info-bar'),
@@ -76,20 +149,15 @@ final class WP_Top_Info_Bar_Admin {
 				'callback' => 'render_text_delay_field',
 				'tooltip'  => __('Set when the text animation should start. You can enter 2000, 2000ms or 2s. A plain number is treated as milliseconds.', 'wp-top-info-bar'),
 			),
-			'font_size'        => array(
-				'label'    => __('Text size', 'wp-top-info-bar'),
-				'callback' => 'render_font_size_field',
-				'tooltip'  => __('Use a CSS font-size value. Examples: 14px, 1rem, clamp(14px, 2vw, 18px).', 'wp-top-info-bar'),
-			),
 			'padding'          => array(
 				'label'    => __('Padding', 'wp-top-info-bar'),
 				'callback' => 'render_padding_field',
-				'tooltip'  => __('Use a CSS padding value for the inside spacing of the bar. Example: 12px 16px.', 'wp-top-info-bar'),
+				'tooltip'  => __('Inner spacing in pixels: Top, Right, Bottom and Left. Enter a number, for example 12, without px. Values cannot be negative. Empty tablet/mobile sides inherit from the larger screen; use 0 to remove a spacing.', 'wp-top-info-bar'),
 			),
 			'margin'           => array(
 				'label'    => __('Margin', 'wp-top-info-bar'),
 				'callback' => 'render_margin_field',
-				'tooltip'  => __('Use a CSS margin value for outer spacing around the bar. Example: 0 0 20px 0.', 'wp-top-info-bar'),
+				'tooltip'  => __('Outer spacing in pixels: Top, Right, Bottom and Left. Enter a number, for example 20 or -10, without px. Negative values are allowed. Empty tablet/mobile sides inherit from the larger screen; use 0 to remove a spacing.', 'wp-top-info-bar'),
 			),
 			'custom_class'     => array(
 				'label'    => __('Custom classes', 'wp-top-info-bar'),
@@ -109,60 +177,118 @@ final class WP_Top_Info_Bar_Admin {
 		);
 
 		foreach ($fields as $id => $field) {
+			$page = in_array($id, array('padding', 'margin'), true) ? 'spacing' : (in_array($id, array('message', 'font_size', 'text_color'), true) ? 'text' : (in_array($id, array('animation', 'text_delay'), true) ? 'animation' : (in_array($id, array('custom_class', 'custom_id'), true) ? 'custom' : 'generell')));
+			if ('background_color' === $id) { $page = 'background'; }
+			$title = $this->get_settings_field_title_markup($field['label'], $field['tooltip']);
+			if (in_array($id, array('font_size', 'padding', 'margin'), true)) {
+				$title .= '<span class="wp-top-info-bar-admin__devices" role="group" aria-label="' . esc_attr($field['label'] . ' ? ' . __('Device', 'wp-top-info-bar')) . '">';
+				foreach (array('desktop' => array(__('Desktop', 'wp-top-info-bar'), 'dashicons-desktop'), 'tablet' => array(__('Tablet', 'wp-top-info-bar'), 'dashicons-tablet'), 'mobile' => array(__('Mobile', 'wp-top-info-bar'), 'dashicons-smartphone')) as $device => $meta) {
+					$title .= '<button type="button" class="wp-top-info-bar-admin__device" data-device="' . esc_attr($device) . '" aria-label="' . esc_attr($meta[0]) . '" title="' . esc_attr($meta[0]) . '" aria-pressed="' . ('desktop' === $device ? 'true' : 'false') . '"><span class="dashicons ' . esc_attr($meta[1]) . '" aria-hidden="true"></span></button>';
+				}
+				$title .= '</span>';
+			}
 			add_settings_field(
 				$id,
-				$this->get_settings_field_title_markup($field['label'], $field['tooltip']),
+				$title,
 				array($this, $field['callback']),
 				WP_Top_Info_Bar_Settings::MENU_SLUG,
-				WP_Top_Info_Bar_Settings::SETTINGS_SECTION
+				WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_' . $page,
+				array('class' => 'wp-top-info-bar-field-' . $id . ('font_size' === $id ? ' wp-top-info-bar-font-size-row' : ''))
 			);
 		}
 	}
 
-	public function render_settings_page(): void {
-		if (! current_user_can('manage_options')) {
-			return;
-		}
+	private static function pages(): array {
+		return array(
+			'generell' => array(__('Generell', 'wp-top-info-bar'), 'dashicons-admin-generic'),
+			'animation' => array(__('Animation', 'wp-top-info-bar'), 'dashicons-controls-play'),
+			'custom' => array(__('Custom', 'wp-top-info-bar'), 'dashicons-editor-code'),
+		);
+	}
 
+	public function render_settings_page(): void {
+		echo '<div class="wrap"><p>' . esc_html__('Open the Top Info Bar editor to change its settings.', 'wp-top-info-bar') . '</p></div>';
+	}
+
+	public function render_settings_box($post): void {
+		$this->settings = new WP_Top_Info_Bar_Settings((int) $post->ID);
+		wp_nonce_field(self::SAVE_NONCE, self::SAVE_NONCE . '_nonce');
 		?>
-		<div class="wrap wp-top-info-bar-settings">
-			<h1><?php echo esc_html__('Top Info Bar Settings', 'wp-top-info-bar'); ?></h1>
-			<form method="post" action="options.php">
-				<?php
-				settings_fields(WP_Top_Info_Bar_Settings::SETTINGS_GROUP);
-				do_settings_sections(WP_Top_Info_Bar_Settings::MENU_SLUG);
-				submit_button(__('Save Settings', 'wp-top-info-bar'));
-				?>
-			</form>
+		<div class="wp-top-info-bar-settings">
+				<div class="wp-top-info-bar-admin">
+				<nav class="wp-top-info-bar-admin__menu" aria-label="<?php esc_attr_e('Bar settings', 'wp-top-info-bar'); ?>">
+				<div class="wp-top-info-bar-admin__switch wp-top-info-bar-admin__enable"><?php $this->render_enabled_field(); ?></div>
+				<?php foreach (self::pages() as $page => $meta) : ?>
+					<button type="button" class="wp-top-info-bar-admin__menu-item" data-page="<?php echo esc_attr($page); ?>" aria-controls="wp-top-info-bar-page-<?php echo esc_attr($page); ?>" aria-current="<?php echo 'generell' === $page ? 'true' : 'false'; ?>"><span class="dashicons <?php echo esc_attr($meta[1]); ?>" aria-hidden="true"></span><span><?php echo esc_html($meta[0]); ?></span></button>
+				<?php endforeach; ?>
+				</nav>
+				<div class="wp-top-info-bar-admin__settings">
+				<?php foreach (self::pages() as $page => $meta) : ?>
+					<fieldset class="wp-top-info-bar-admin__page" id="wp-top-info-bar-page-<?php echo esc_attr($page); ?>" data-page="<?php echo esc_attr($page); ?>"<?php echo 'generell' === $page ? '' : ' hidden'; ?>>
+						<legend><?php echo esc_html($meta[0]); ?></legend>
+						<?php if ('generell' === $page) : ?>
+						<div class="wp-top-info-bar-admin__text-block"><table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_text'); ?></tbody></table></div>
+						<div class="wp-top-info-bar-admin__background-block"><table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_background'); ?></tbody></table></div>
+						<div class="wp-top-info-bar-admin__spacing-block"><table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_spacing'); ?></tbody></table></div>
+						<?php endif; ?>
+						<table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_' . $page); ?></tbody></table>
+					</fieldset>
+				<?php endforeach; ?>
+				</div>
+				<?php WP_Top_Info_Bar_Preview::render_panel(); ?>
+				</div>
 		</div>
 		<?php
 	}
 
 	public function enqueue_admin_assets(string $hook_suffix): void {
-		if ('toplevel_page_' . WP_Top_Info_Bar_Settings::MENU_SLUG !== $hook_suffix) {
+		$screen = get_current_screen();
+		if (! $screen || WP_Top_Info_Bar_Settings::POST_TYPE !== $screen->post_type || ! in_array($hook_suffix, array('post.php', 'post-new.php'), true)) {
 			return;
 		}
 
 		wp_enqueue_media();
+		wp_enqueue_editor();
+		wp_enqueue_style('wp-top-info-bar-pickr', WP_TOP_INFO_BAR_URL . 'assets/vendor/pickr/classic.min.css', array(), '1.9.1');
+		wp_enqueue_script('wp-top-info-bar-pickr', WP_TOP_INFO_BAR_URL . 'assets/vendor/pickr/pickr.min.js', array(), '1.9.1', true);
 		wp_enqueue_style(
 			'wp-top-info-bar-admin',
 			WP_TOP_INFO_BAR_URL . 'assets/css/admin.css',
 			array(),
-			WP_TOP_INFO_BAR_VERSION
+			(string) filemtime(WP_TOP_INFO_BAR_PATH . 'assets/css/admin.css')
 		);
 		wp_enqueue_script(
 			'wp-top-info-bar-admin',
 			WP_TOP_INFO_BAR_URL . 'assets/js/admin.js',
-			array('jquery', 'wp-util'),
-			WP_TOP_INFO_BAR_VERSION,
+			array('jquery', 'wp-util', 'editor'),
+			(string) filemtime(WP_TOP_INFO_BAR_PATH . 'assets/js/admin.js'),
 			true
 		);
+		wp_enqueue_style('wp-top-info-bar-preview', WP_TOP_INFO_BAR_URL . 'assets/css/preview.css', array('wp-top-info-bar-admin'), (string) filemtime(WP_TOP_INFO_BAR_PATH . 'assets/css/preview.css'));
+		wp_enqueue_script('wp-top-info-bar-preview', WP_TOP_INFO_BAR_URL . 'assets/js/preview.js', array('wp-top-info-bar-admin'), (string) filemtime(WP_TOP_INFO_BAR_PATH . 'assets/js/preview.js'), true);
+		wp_enqueue_style('wp-top-info-bar-colors', WP_TOP_INFO_BAR_URL . 'assets/css/colors.css', array('wp-top-info-bar-admin', 'wp-top-info-bar-pickr'), (string) filemtime(WP_TOP_INFO_BAR_PATH . 'assets/css/colors.css'));
+		wp_enqueue_script('wp-top-info-bar-colors', WP_TOP_INFO_BAR_URL . 'assets/js/colors.js', array('wp-top-info-bar-admin', 'wp-top-info-bar-pickr'), (string) filemtime(WP_TOP_INFO_BAR_PATH . 'assets/js/colors.js'), true);
 
 		wp_localize_script(
 			'wp-top-info-bar-admin',
 			'wpTopInfoBarAdmin',
 			array(
 				'optionName' => WP_Top_Info_Bar_Settings::OPTION_NAME,
+				'textColors' => WP_Top_Info_Bar_Palette::tinymce_map(),
+				'colorPicker' => array(
+					'ui:dialog' => __('Color picker', 'wp-top-info-bar'),
+					'btn:toggle' => __('Choose a color', 'wp-top-info-bar'),
+					'btn:swatch' => __('Color', 'wp-top-info-bar'),
+					'btn:cancel' => __('Cancel', 'wp-top-info-bar'),
+					'aria:btn:cancel' => __('Back to the color it had when opened', 'wp-top-info-bar'),
+					'aria:input' => __('Color value', 'wp-top-info-bar'),
+					'aria:palette' => __('Color and brightness', 'wp-top-info-bar'),
+					'aria:hue' => __('Hue', 'wp-top-info-bar'),
+					'aria:opacity' => __('Opacity', 'wp-top-info-bar'),
+					'default' => __('Default', 'wp-top-info-bar'),
+					'defaultLabel' => __('Back to the default color', 'wp-top-info-bar'),
+				),
+				'previewError' => __('Could not load the preview. Try Update again.', 'wp-top-info-bar'),
 				'labels'     => array(
 					'changeImage'  => __('Change image', 'wp-top-info-bar'),
 					'chooseImage'  => __('Choose image', 'wp-top-info-bar'),
@@ -183,7 +309,7 @@ final class WP_Top_Info_Bar_Admin {
 				value="1"
 				<?php checked(1, (int) $settings['enabled']); ?>
 			/>
-			<?php echo esc_html__('Show the bar on the site frontend', 'wp-top-info-bar'); ?>
+			<?php echo esc_html__('Enable bar', 'wp-top-info-bar'); ?>
 		</label>
 		<?php
 	}
@@ -193,36 +319,22 @@ final class WP_Top_Info_Bar_Admin {
 		?>
 		<textarea
 			id="wp-top-info-bar-message"
+			class="large-text wp-top-info-bar-text-editor"
 			name="<?php echo esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME); ?>[message]"
 			rows="5"
 			cols="60"
-			class="large-text"
 		><?php echo esc_textarea($settings['message']); ?></textarea>
 		<?php
 	}
 
 	public function render_background_color_field(): void {
 		$settings = $this->settings->get_settings();
-		?>
-		<input
-			type="color"
-			id="wp-top-info-bar-background-color"
-			name="<?php echo esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME); ?>[background_color]"
-			value="<?php echo esc_attr($settings['background_color']); ?>"
-		/>
-		<?php
+		$this->color('background_color', $settings['background_color'], '#1f2937');
 	}
 
 	public function render_text_color_field(): void {
 		$settings = $this->settings->get_settings();
-		?>
-		<input
-			type="color"
-			id="wp-top-info-bar-text-color"
-			name="<?php echo esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME); ?>[text_color]"
-			value="<?php echo esc_attr($settings['text_color']); ?>"
-		/>
-		<?php
+		$this->color('text_color', $settings['text_color'], '#ffffff');
 	}
 
 	public function render_animation_field(): void {
@@ -268,71 +380,28 @@ final class WP_Top_Info_Bar_Admin {
 
 	public function render_font_size_field(): void {
 		$settings = $this->settings->get_settings();
-		?>
-		<?php
-		echo $this->get_responsive_inputs_markup(
-			WP_Top_Info_Bar_Settings::OPTION_NAME,
-			'font_size',
-			array(
-				'desktop' => $settings['font_size'],
-				'tablet'  => $settings['font_size_tablet'],
-				'mobile'  => $settings['font_size_mobile'],
-			),
-			array(
-				'desktop' => '14px',
-				'tablet'  => '',
-				'mobile'  => '',
-			),
-			'wp-top-info-bar-font-size'
-		);
-		?>
-		<?php
+		foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) {
+			printf('<input type="text" class="regular-text wp-top-info-bar-admin__device-input" data-device="%1$s" id="wp-top-info-bar-font-size%2$s" name="%3$s[font_size%2$s]" value="%4$s" aria-label="%5$s"%6$s>', esc_attr($device), esc_attr($suffix), esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME), esc_attr($settings['font_size' . $suffix]), esc_attr(sprintf(__('Text size: %s', 'wp-top-info-bar'), $device)), 'desktop' === $device ? '' : ' hidden');
+		}
 	}
 
-	public function render_padding_field(): void {
-		$settings = $this->settings->get_settings();
-		?>
-		<?php
-		echo $this->get_responsive_inputs_markup(
-			WP_Top_Info_Bar_Settings::OPTION_NAME,
-			'padding',
-			array(
-				'desktop' => $settings['padding'],
-				'tablet'  => $settings['padding_tablet'],
-				'mobile'  => $settings['padding_mobile'],
-			),
-			array(
-				'desktop' => '12px 16px',
-				'tablet'  => '',
-				'mobile'  => '',
-			),
-			'wp-top-info-bar-padding'
-		);
-		?>
-		<?php
-	}
+	public function render_padding_field(): void { $this->render_spacing('padding'); }
 
-	public function render_margin_field(): void {
+	public function render_margin_field(): void { $this->render_spacing('margin'); }
+
+	private function render_spacing(string $key): void {
 		$settings = $this->settings->get_settings();
-		?>
-		<?php
-		echo $this->get_responsive_inputs_markup(
-			WP_Top_Info_Bar_Settings::OPTION_NAME,
-			'margin',
-			array(
-				'desktop' => $settings['margin'],
-				'tablet'  => $settings['margin_tablet'],
-				'mobile'  => $settings['margin_mobile'],
-			),
-			array(
-				'desktop' => '0 0 20px 0',
-				'tablet'  => '',
-				'mobile'  => '',
-			),
-			'wp-top-info-bar-margin'
-		);
-		?>
-		<?php
+		$labels = array('top' => __('Top', 'wp-top-info-bar'), 'right' => __('Right', 'wp-top-info-bar'), 'bottom' => __('Bottom', 'wp-top-info-bar'), 'left' => __('Left', 'wp-top-info-bar'));
+		foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) {
+			$values = isset($settings[$key . '_sides'][$device]) && is_array($settings[$key . '_sides'][$device]) ? $settings[$key . '_sides'][$device] : WP_Top_Info_Bar_Sanitizer::spacing_sides($settings[$key . $suffix]);
+			echo '<div class="wp-top-info-bar-admin__spacing-inputs" data-device="' . esc_attr($device) . '"' . ('desktop' === $device ? '' : ' hidden') . '>';
+			foreach ($labels as $side => $label) {
+				$value = (string) ($values[$side] ?? '');
+				$number = preg_match('/^(-?(?:\d+(?:\.\d+)?|\.\d+))(?:px)?$/i', trim($value), $match) ? (string) (float) $match[1] : '';
+				printf('<label><span>%1$s (px)</span><input type="number" step="any"%8$s class="regular-text" data-side="%2$s" value="%6$s" aria-label="%7$s"><input type="hidden" class="wp-top-info-bar-admin__spacing-value" name="%3$s[%4$s_sides][%5$s][%2$s]" value="%9$s"></label>', esc_html($label), esc_attr($side), esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME), esc_attr($key), esc_attr($device), esc_attr($number), esc_attr(ucfirst($key) . ': ' . $label . ' (px, ' . $device . ')'), 'padding' === $key ? ' min="0"' : '', esc_attr($value));
+			}
+			echo '</div>';
+		}
 	}
 
 	public function render_custom_class_field(): void {
@@ -639,6 +708,10 @@ final class WP_Top_Info_Bar_Admin {
 			esc_attr(sprintf(__('%s help', 'wp-top-info-bar'), $alt_text)),
 			esc_html($tooltip)
 		);
+	}
+
+	private function color(string $key, string $value, string $default): void {
+		printf('<span class="wp-top-info-bar-color-pick" data-alpha="1" data-default="%1$s"><input type="hidden" class="wp-top-info-bar-color-pick__value" name="%2$s[%3$s]" value="%4$s"><button type="button" class="wp-top-info-bar-color-pick__swatch" aria-label="%5$s" aria-expanded="false"><span class="wp-top-info-bar-color-pick__chip" aria-hidden="true"></span></button></span>', esc_attr($default), esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME), esc_attr($key), esc_attr($value), esc_attr__('Choose a color', 'wp-top-info-bar'));
 	}
 
 	private function get_responsive_inputs_markup(string $name_prefix, string $base_key, array $values, array $placeholders = array(), string $id_prefix = ''): string {

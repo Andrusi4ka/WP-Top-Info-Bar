@@ -70,6 +70,16 @@
 	text-align: center;
 }
 
+.wp-top-info-bar__inner > :first-child { margin-top: 0; }
+.wp-top-info-bar__inner > :last-child { margin-bottom: 0; }
+.wp-top-info-bar__inner p { margin: 0 0 0.75em; }
+.wp-top-info-bar__inner p:last-child { margin-bottom: 0; }
+.wp-top-info-bar__inner a { color: inherit; text-decoration: underline; }
+.wp-top-info-bar__inner ul,
+.wp-top-info-bar__inner ol { padding-inline-start: 1.5em; }
+.wp-top-info-bar__inner ul { list-style: disc; }
+.wp-top-info-bar__inner ol { list-style: decimal; }
+
 .wp-top-info-bar__inner--fade-in {
 	animation: wp-top-info-bar-text-fade-in 0.9s ease-out both;
 	animation-delay: var(--wp-top-info-bar-text-delay, 0s);

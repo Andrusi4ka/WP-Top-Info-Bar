@@ -42,7 +42,7 @@
 					previewUrl = attachment.sizes.thumbnail.url;
 				}
 
-				$row.find('[data-image-id]').val(attachment.id);
+				$row.find('[data-image-id]').val(attachment.id).trigger('change');
 				$preview
 					.addClass('has-image')
 					.attr('aria-label', labels.changeImage || 'Change image')
@@ -89,6 +89,31 @@
 	}
 
 	$(function () {
+		const editorId = 'wp-top-info-bar-message';
+		const $message = $('#' + editorId);
+		if ($message.length && window.wp && wp.editor && wp.editor.initialize) {
+			const palette = Array.isArray(config.textColors) ? config.textColors : [];
+			wp.editor.initialize(editorId, {
+				tinymce: window.tinymce ? {
+					toolbar1: 'formatselect,bold,italic,underline,forecolor,alignleft,aligncenter,alignright,bullist,numlist,link,unlink,removeformat,undo,redo',
+					toolbar2: '',
+					block_formats: 'Paragraph=p;Heading 1=h1;Heading 2=h2;Heading 3=h3;Heading 4=h4;Heading 5=h5;Heading 6=h6',
+					height: 160,
+					forecolor_map: palette,
+					forecolor_cols: 8,
+					forecolor_rows: Math.ceil((palette.length / 2 + 1) / 8),
+					setup: function (instance) {
+						instance.on('change input keyup undo redo', function () {
+							instance.save();
+							$message.trigger('change');
+						});
+					}
+				} : false,
+				quicktags: {buttons: 'strong,em,link,ul,ol,li'},
+				mediaButtons: false
+			});
+		}
+
 		const $list = $('[data-images-list]');
 		const template = wp.template('wp-top-info-bar-image-row');
 		const $textDelay = $('#wp-top-info-bar-text-delay');

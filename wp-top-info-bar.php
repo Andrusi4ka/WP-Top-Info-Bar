@@ -30,8 +30,10 @@ define('WP_TOP_INFO_BAR_URL', plugin_dir_url(__FILE__));
 
 require_once WP_TOP_INFO_BAR_PATH . 'includes/class-wp-top-info-bar-settings.php';
 require_once WP_TOP_INFO_BAR_PATH . 'includes/class-wp-top-info-bar-sanitizer.php';
+require_once WP_TOP_INFO_BAR_PATH . 'includes/class-wp-top-info-bar-palette.php';
 require_once WP_TOP_INFO_BAR_PATH . 'includes/class-wp-top-info-bar-admin.php';
 require_once WP_TOP_INFO_BAR_PATH . 'includes/class-wp-top-info-bar-frontend.php';
+require_once WP_TOP_INFO_BAR_PATH . 'includes/class-wp-top-info-bar-preview.php';
 require_once WP_TOP_INFO_BAR_PATH . 'includes/class-wp-top-info-bar.php';
 
 /**
@@ -62,3 +64,4 @@ add_action('init', 'wp_top_info_bar_load_textdomain');
 register_activation_hook(__FILE__, array('WP_Top_Info_Bar', 'activate'));
 
 WP_Top_Info_Bar::instance();
+WP_Top_Info_Bar_Preview::init();
