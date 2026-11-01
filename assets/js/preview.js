@@ -22,7 +22,23 @@
  });
  const devices=['desktop','tablet','mobile'];let currentDevice='desktop';
  try{const kept=localStorage.getItem('wpTopInfoBarDevice');if(devices.includes(kept))currentDevice=kept;}catch(e){}
- function state(){return JSON.stringify($form.serializeArray().filter(item=>item.name.indexOf((window.wpTopInfoBarAdmin||{}).optionName+'[')===0));}
+ function state() {
+  const overrides = new Map();
+  $box.find('[data-image-row]').each(function() {
+   const name = $(this).find('[data-image-id]').attr('name') || '', own = new Set();
+   $(this).find('[data-image-override-field]').each(function() { if(this.value === '1') own.add($(this).data('image-override-field')); });
+   overrides.set(name.replace(/\[image_id\]$/, ''), own);
+  });
+  return JSON.stringify($form.serializeArray().filter(function(item) {
+   if(item.name.indexOf((window.wpTopInfoBarAdmin||{}).optionName+'[') !== 0) return false;
+   const match = /^(.*\[images\]\[\d+\])\[([^\]]+)\]/.exec(item.name);
+   if(!match || !overrides.has(match[1])) return true;
+   const key = match[2];
+   if(['image_id','override_enabled','override_fields','position','position_tablet','position_mobile'].includes(key)) return true;
+   const group = /^size/.test(key) ? 'size' : /^margin/.test(key) ? 'margin' : /^animation/.test(key) ? 'animation' : /^custom_class/.test(key) ? 'custom_class' : key;
+   return overrides.get(match[1]).has(group);
+  }));
+ }
  let renderedState=null,requestedState=null;
  function syncStale(){$update.toggleClass('is-stale',state()!==renderedState);}
  function refresh(){
@@ -42,7 +58,8 @@
   applyDev();
  });
  const $error=$('<p class="description wp-top-info-bar-preview__error" role="status" hidden></p>').text((window.wpTopInfoBarAdmin||{}).previewError||'Could not load the preview. Try Update again.').appendTo($preview);
- $form.on('input change','input,textarea,select',syncStale);
+ $box.on('input change','input,textarea,select',syncStale);
+ $box.on('wpTopInfoBarTextsChanged wpTopInfoBarButtonsChanged',syncStale);
  // Saving uses WordPress's Publish box. Preview updates never save the form.
  const savedState = state() + ($('#title').val() || '');
  let saving = false;
@@ -74,6 +91,7 @@
   $box.find('.wp-top-info-bar-admin__device-input').each(function() { this.hidden = $(this).data('device') !== device; });
   $box.find('.wp-top-info-bar-admin__spacing-inputs').each(function() { this.hidden = $(this).data('device') !== device; });
   $box.find('.wp-top-info-bar-admin__responsive-device').each(function() { this.hidden = $(this).data('device') !== device; });
+  $(document).trigger('wpTopInfoBarDeviceChanged');
   fitPreview();
   try { localStorage.setItem('wpTopInfoBarDevice', device); } catch(e) {}
  }
@@ -91,7 +109,7 @@
     let own = false;
     $row.find('.wp-top-info-bar-admin__spacing-inputs[data-device="' + device + '"] input[data-side]').each(function() {
      const side = $(this).data('side'), value = $.trim($(this).siblings('.wp-top-info-bar-admin__spacing-value').val());
-     this.placeholder = value && this.value === '' ? value : inherited[side];
+     this.placeholder = this.hasAttribute('data-inherited-group') ? 'Inherit' : (value && this.value === '' ? value : inherited[side]);
      if(value) { inherited[side] = value.replace(/px$/i, ''); own = true; }
     });
     $row.find('.wp-top-info-bar-admin__device[data-device="' + device + '"]').toggleClass('has-value', device !== 'desktop' && own);
@@ -110,7 +128,7 @@
    devices.forEach(function(device) {
     const $input = $field.find('.wp-top-info-bar-admin__responsive-device[data-device="' + device + '"] [data-image-size]');
     const value = $.trim($input.siblings('.wp-top-info-bar-image-size-value').val() || '');
-    $input.attr('placeholder', value && $input.val() === '' ? value : inherited);
+    $input.attr('placeholder', $input.is('[data-inherited-group]') ? 'Inherit' : (value && $input.val() === '' ? value : inherited));
     $field.find('.wp-top-info-bar-admin__device[data-device="' + device + '"]').toggleClass('has-value', device !== 'desktop' && value !== '');
     if(value) inherited = value.replace(/px$/i, '');
    });
@@ -122,10 +140,28 @@
  });
  $box.on('wpTopInfoBarImagesChanged', function() {
   syncImageSizes();
+  syncImagePositions();
   syncSpacing();
   setDevice(currentDevice);
  });
  syncImageSizes();
+ function syncImagePositions() {
+  $box.find('.wp-top-info-bar-image-position-field').each(function() {
+   const $field = $(this);
+   let inherited = 'left';
+   devices.forEach(function(device) {
+    const $select = $field.find('.wp-top-info-bar-admin__responsive-device[data-device="' + device + '"] select');
+    const value = $select.val() || '';
+    const $inherit = $select.find('option[value=""]');
+    const label = $select.find('option').filter(function() { return this.value === inherited; }).text();
+    $inherit.text(($inherit.data('label') || 'Inherit') + ' (' + label + ')');
+    $field.find('.wp-top-info-bar-admin__device[data-device="' + device + '"]').toggleClass('has-value', device !== 'desktop' && value !== '');
+    if(value) inherited = value;
+   });
+  });
+ }
+ $box.on('change', '[data-image-position]', syncImagePositions);
+ syncImagePositions();
  $preview.on('click','.wp-top-info-bar-preview__device-btn',function(){setDevice($(this).data('device'));});
  $box.on('click', '.wp-top-info-bar-admin__menu-item', function() {
   const page = $(this).data('page');

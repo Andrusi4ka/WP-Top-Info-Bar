@@ -1,7 +1,7 @@
 (function($){'use strict';$(function(){var l10n=window.wpTopInfoBarAdmin||{},$box=$('.wp-top-info-bar-admin');
 		var COLOR_PICK = '.wp-top-info-bar-color-pick';
 		var colorI18n = $.extend( {}, l10n.colorPicker || {} );
-		// The palette's colors and names (TinyMCE's map: "RRGGBB", name, …).
+		// The palette's colors and names (TinyMCE's map: "RRGGBB", name, â€¦).
 		var colorSwatches = [];
 		var colorNames = [];
 		( $.isArray( l10n.textColors ) ? l10n.textColors : [] ).forEach( function ( item, i, map ) {
@@ -190,6 +190,10 @@
 				makePickr( $pick );
 			}
 		} );
+		$(document).on('wpTopInfoBarSetColor', COLOR_PICK, function (event, value) {
+			var $pick = $(this), color = parseColor(value) || pickDefault($pick);
+			setColor($pick, color.hex, color.alpha); pickrShow($pick);
+		});
 		// The fields show their saved color.
 		$( COLOR_PICK ).each( function () {
 			var $pick = $( this );

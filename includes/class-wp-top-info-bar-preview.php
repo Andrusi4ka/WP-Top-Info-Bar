@@ -232,7 +232,7 @@ class WP_Top_Info_Bar_Preview {
 		} elseif ( '' === trim( $settings['message'] ) && empty( $settings['images'] ) ) {
 			echo '<p style="margin:24px;color:#646970;font-size:14px;text-align:center">' . esc_html__( 'Add text or an image to preview the bar.', 'wp-top-info-bar' ) . '</p>';
 		}
-		?><script src="<?php echo esc_url( WP_TOP_INFO_BAR_URL . 'assets/js/preview-dev.js?ver=' . filemtime( WP_TOP_INFO_BAR_PATH . 'assets/js/preview-dev.js' ) ); ?>"></script></body></html><?php
+		?><script src="<?php echo esc_url( WP_TOP_INFO_BAR_URL . 'assets/js/frontend.js?ver=' . filemtime( WP_TOP_INFO_BAR_PATH . 'assets/js/frontend.js' ) ); ?>"></script><script src="<?php echo esc_url( WP_TOP_INFO_BAR_URL . 'assets/js/preview-dev.js?ver=' . filemtime( WP_TOP_INFO_BAR_PATH . 'assets/js/preview-dev.js' ) ); ?>"></script></body></html><?php
 		exit;
 	}
 }
