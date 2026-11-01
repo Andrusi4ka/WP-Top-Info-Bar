@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       WP Top Info Bar
+ * Plugin Name:       WP Top Bar
  * Plugin URI:        https://github.com/Andrusi4ka/WP-Top-Info-Bar
  * Description:       Adds a configurable information bar at the very top of the site.
  * Version:           3.0.0

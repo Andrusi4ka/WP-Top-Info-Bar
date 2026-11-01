@@ -2,7 +2,7 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: WP Top Info Bar 3.0.0\n"
+"Project-Id-Version: WP Top Bar 3.0.0\n"
 "Report-Msgid-Bugs-To: https://github.com/Andrusi4ka/WP-Top-Info-Bar/issues\n"
 "POT-Creation-Date: 2026-10-10 20:43+0000\n"
 "MIME-Version: 1.0\n"
@@ -11,7 +11,7 @@ msgstr ""
 "X-Domain: wp-top-info-bar\n"
 
 #: includes/class-wp-top-info-bar-admin.php:22 includes/class-wp-top-info-bar-admin.php:23
-msgid "Top Info Bar"
+msgid "Top Bar"
 msgstr ""
 
 #: includes/class-wp-top-info-bar-admin.php:41
@@ -119,7 +119,7 @@ msgid "Add one or more images with individual size, margin, custom class and pos
 msgstr ""
 
 #: includes/class-wp-top-info-bar-admin.php:129
-msgid "Top Info Bar Settings"
+msgid "Top Bar Settings"
 msgstr ""
 
 #: includes/class-wp-top-info-bar-admin.php:134
@@ -304,7 +304,7 @@ msgid "Mobile: applied on screens up to 767px wide."
 msgstr ""
 
 #: wp-top-info-bar.php
-msgid "WP Top Info Bar"
+msgid "WP Top Bar"
 msgstr ""
 
 #: wp-top-info-bar.php

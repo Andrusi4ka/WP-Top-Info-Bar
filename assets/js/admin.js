@@ -74,11 +74,6 @@
 		return {size: JSON.stringify(sizes), margin: JSON.stringify(margins), animation: animation || 'none', delay: delay, custom_class: classes};
 	}
 
-	function hasIndividualSettings($row) {
-		const own = imageStyle($row), shared = imageStyle($('[data-image-shared]'));
-		return Object.keys(own).some(group => $row.find('[data-image-override-field="' + group + '"]').val() === '1' && own[group] !== shared[group]);
-	}
-
 	let layoutTargetZone = 'center';
 	function layoutZones() { try { const value = JSON.parse($('[data-layout-zones]').val() || '{}'); return value && !Array.isArray(value) ? value : {}; } catch (e) { return {}; } }
 	function saveLayoutZones() {
@@ -99,6 +94,15 @@
 		if (!order.includes(key)) order.push(key);
 		$('[data-layout-order]').val(JSON.stringify(order)).trigger('change');
 		layoutTargetZone = 'center';
+	}, cloneAfter:function (source, key) {
+		const keys = $('[data-layout-tile]').map(function () { return $(this).attr('data-layout-key'); }).get().filter(id => id !== key);
+		const index = keys.indexOf(source); keys.splice(index < 0 ? keys.length : index + 1, 0, key);
+		const zones = layoutZones();
+		const $source = $('[data-layout-tile]').filter(function () { return $(this).attr('data-layout-key') === source; });
+		zones[key] = zones[source] || $source.closest('[data-layout-zone]').attr('data-layout-zone') || 'center';
+		$('[data-layout-zones]').val(JSON.stringify(zones)).trigger('change');
+		$('[data-layout-order]').val(JSON.stringify(keys)).trigger('change');
+		syncLayoutTiles();
 	} };
 	let layoutDragging = false;
 	let layoutDropUntil = 0;
@@ -157,23 +161,9 @@
 		});
 	}
 
-	function syncGallery() {
-		const $gallery = $('[data-images-gallery]');
-		$gallery.find('[data-image-gallery-item]').remove();
-		$('[data-images-list] [data-image-row]').each(function (index) {
-			const $row = $(this), src = $row.find('[data-image-preview] img').attr('src');
-			const $button = $('<button type="button" class="wp-top-info-bar-gallery__item" data-image-gallery-item></button>')
-				.attr({'aria-label': (labels.editImage || 'Edit Image %d').replace('%d', index + 1), 'aria-haspopup': 'dialog'})
-				.toggleClass('has-settings', hasIndividualSettings($row)).data('row', this);
-			if(src) $button.append($('<img alt="">').attr('src', src));
-			$button.on('click', function () { openImage($row, this); }).insertBefore($gallery.find('[data-add-image-row]'));
-		});
-		syncLayoutTiles();
-	}
+	function syncGallery() { syncLayoutTiles(); }
 
 	function openImage($row, opener) {
-		copySharedSettings($row);
-		showImageInheritance($row);
 		if ($row.data('syncOptions')) $row.data('syncOptions')();
 		activeImage = $row[0]; returnFocus = opener;
 		$('[data-images-list] [data-image-row]').prop('hidden', true);
@@ -189,52 +179,10 @@
 		$('[data-image-modal]').prop('hidden', true);
 		$('[data-images-list] [data-image-row]').prop('hidden', true);
 		$('body').removeClass('wp-top-info-bar-modal-open');
-		const $tile = $('[data-image-gallery-item]').filter(function () { return $(this).data('row') === activeImage; }).first();
-		activeImage = null;
-		const $layoutTile = $('[data-layout-tile]').filter(function () { return $(this).data('row') === $tile.data('row'); }).first();
-		if ($(returnFocus).is('[data-layout-tile]') && $layoutTile.length) $layoutTile.trigger('focus');
-		else if($tile.length) $tile.trigger('focus');
-		else if(returnFocus && document.contains(returnFocus)) $(returnFocus).trigger('focus');
-		else $('[data-add-image-row]').trigger('focus');
-	}
-
-	function showImageInheritance($row) {
-		$row.find('[data-image-size], input[data-side], input[type="text"], select[name$="[animation]"]').each(function () {
-			const $input = $(this);
-			const key = (/\[images\]\[[^\]]+\]\[([^\]]+)/.exec(this.name || '') || [])[1] || '';
-			const group = $input.is('[data-image-size]') ? 'size' : ($input.is('[data-side]') ? 'margin' : imageFieldGroup(key));
-			if (!group || $row.find('[data-image-override-field="' + group + '"]').val() === '1') return;
-			if (this.tagName === 'SELECT') {
-				$input.find('[data-inherited-option]').remove();
-				$('<option data-inherited-option></option>').val(this.value).text('Inherit').prop('selected', true).prependTo($input);
-			} else {
-				$input.data('inheritedValue', this.value).attr('data-inherited-group', group).val('').attr('placeholder', 'Inherit');
-			}
-		});
-	}
-
-	function copySharedSettings($row) {
-		const $shared = $('[data-image-shared]');
-		$row.find('[data-image-individual-options] [name]').each(function () {
-			const suffix = this.name.replace(/^[^\[]+\[images\]\[[^\]]+\]/, '');
-			const group = imageFieldGroup((/^\[([^\]]+)/.exec(suffix) || [])[1] || '');
-			if (!group || $row.find('[data-image-override-field="' + group + '"]').val() === '1') return;
-			if (/_enabled\]$/.test(suffix)) {
-				this.value = imageOptionEnabled($shared, group) ? '1' : '0';
-				return;
-			}
-			const type = this.type;
-			const $source = $shared.find('[name]').filter(function () {
-				return this.name.replace(/^[^\[]+\[image_defaults\]/, '') === suffix && this.type === type;
-			}).first();
-			if(!$source.length) return;
-			if(type === 'checkbox') this.checked = $source.prop('checked');
-			else this.value = $source.val();
-		});
-		$row.find('[data-image-size], input[data-side]').each(function () {
-			const raw = $(this).siblings('input[type="hidden"]').val() || '';
-			this.value = /^-?(?:\d+(?:\.\d+)?|\.\d+)(px)?$/i.test(raw) ? parseFloat(raw) : '';
-		});
+		const image = activeImage; activeImage = null;
+		const $tile = $('[data-layout-tile]').filter(function () { return $(this).data('row') === image; }).first();
+		if ($tile.length) $tile.trigger('focus');
+		else $('[data-layout-zone="center"] [data-layout-add]').trigger('focus');
 	}
 
 	function imageFieldGroup(key) {
@@ -288,7 +236,7 @@
 					$field.find('.wp-top-info-bar-admin__devices').prop('hidden', !this.checked);
 				}
 			});
-			$row.find('[data-image-delay-field]').prop('hidden', $row.is('[data-image-shared]') && !imageOptionEnabled($row, 'animation'));
+			$row.find('[data-image-delay-field]').prop('hidden', !imageOptionEnabled($row, 'animation'));
 			syncDelay($row.find('select[name$="[animation]"]'), $delay, $delay.closest('.wp-top-info-bar-image-row__field'));
 		}
 		$row.find('[data-image-option]').off('change.wpTopInfoBarOptions').on('change.wpTopInfoBarOptions', syncOptions);
@@ -305,7 +253,7 @@
 			});
 			$(this).find('[data-inherited-option]').remove();
 			// Editing an individual option activates it without a checkbox.
-			$row.find('input[type="hidden"][name$="[' + group + '_enabled]"]').val('1');
+			if (!$row.find('[data-image-option="' + group + '"]').length) $row.find('input[type="hidden"][name$="[' + group + '_enabled]"]').val('1');
 			$row.find('[data-image-override-field="' + group + '"]').val('1');
 			$row.find('[data-image-override]').val('1');
 			$row.find('[data-override-initialized]').val('1');
@@ -316,14 +264,79 @@
 	}
 
 	$(function () {
+		// Render help outside the scrollable modal and clamp it to the viewport.
+		let $floatingHelp = null, $helpSource = null;
+		function hideHelp() {
+			if ($floatingHelp) $floatingHelp.remove();
+			if ($helpSource) $helpSource.removeAttr('aria-describedby');
+			$floatingHelp = null; $helpSource = null;
+		}
+		function showHelp() {
+			hideHelp();
+			const $source = $(this), text = $source.find('.wp-top-info-bar-tooltip__content').text();
+			if (!text) return;
+			$helpSource = $source;
+			$floatingHelp = $('<span class="wp-top-info-bar-tooltip__content wp-top-info-bar-tooltip__floating" id="wp-top-info-bar-floating-help" role="tooltip"></span>').text(text).appendTo(document.body);
+			$source.attr('aria-describedby','wp-top-info-bar-floating-help');
+			const rect = this.getBoundingClientRect(), popup = $floatingHelp[0].getBoundingClientRect();
+			const left = Math.max(12, Math.min(rect.left + rect.width / 2 - popup.width / 2, window.innerWidth - popup.width - 12));
+			const below = rect.top - popup.height - 8 < 12;
+			$floatingHelp.css({left:left, top:below ? rect.bottom + 8 : rect.top - popup.height - 8}).toggleClass('is-below',below);
+			$floatingHelp[0].style.setProperty('--tooltip-arrow', Math.max(10, Math.min(popup.width - 10, rect.left + rect.width / 2 - left)) + 'px');
+		}
+		$(document).on('mouseenter.wpTopHelp focusin.wpTopHelp','.wp-top-info-bar-tooltip',showHelp)
+			.on('mouseleave.wpTopHelp focusout.wpTopHelp','.wp-top-info-bar-tooltip',hideHelp);
+		document.addEventListener('scroll',hideHelp,true); window.addEventListener('resize',hideHelp);
+		$(document).on('click.wpTopHelp keydown.wpTopHelp','[data-close-zone-modal], [data-close-text-modal], [data-close-button-modal], [data-close-image-modal]',hideHelp);
+
 		$(document).on('input.wpTopInfoBarTiles change.wpTopInfoBarTiles', '.wp-top-info-bar-admin input, .wp-top-info-bar-admin select, .wp-top-info-bar-admin textarea', function () { setTimeout(syncLayoutTiles, 0); });
 		$('.wp-top-info-bar-admin').on('wpTopInfoBarImagesChanged wpTopInfoBarPageChange wpTopInfoBarTextsChanged wpTopInfoBarButtonsChanged', function () { setTimeout(syncLayoutTiles, 0); });
+		function syncAppearanceSpacing() {
+			$('[data-spacing-toggle]').each(function () { $(this).closest('tr').find('[data-spacing-options], .wp-top-info-bar-admin__devices').prop('hidden', !this.checked); });
+		}
+		$('[data-spacing-toggle]').on('change',syncAppearanceSpacing); syncAppearanceSpacing();
+		function syncBarDecorations() {
+			$('[data-bar-decoration]').each(function () { $('[data-bar-decoration-options="' + $(this).attr('data-bar-decoration') + '"]').prop('hidden', !this.checked); });
+		}
+		$('[data-bar-decoration]').on('change', syncBarDecorations); syncBarDecorations();
 		const $zoneModal = $('[data-zone-modal]');
 		const $zoneForm = $zoneModal.closest('form');
 		if (!$zoneForm.attr('id')) $zoneForm.attr('id', 'wp-top-info-bar-form');
 		$zoneModal.find('input, select, textarea, button').attr('form', $zoneForm.attr('id'));
 		$zoneModal.appendTo(document.body);
 		let zoneOpener = null;
+		function syncZoneSpacing() {
+			$zoneModal.find('[data-zone-spacing-toggle]').each(function () {
+				$(this).closest('.wp-top-info-bar-zone-modal__field').find('[data-zone-spacing-options], .wp-top-info-bar-admin__devices').prop('hidden', !this.checked);
+			});
+		}
+		$zoneModal.on('change', '[data-zone-spacing-toggle]', syncZoneSpacing);
+		syncZoneSpacing();
+		function syncZoneAnimationFields() {
+			$zoneModal.find('[data-zone-animation-block]').each(function () {
+				const $block = $(this); let mode = 'inherit', effect = 'fade-in', currentMode = mode, currentEffect = effect;
+				['desktop', 'tablet', 'mobile'].forEach(function (device) {
+					const $device = $block.find('.wp-top-info-bar-admin__responsive-device[data-device="' + device + '"]');
+					mode = $device.find('[data-zone-animation-input="animation_mode"]').val() || mode;
+					effect = $device.find('[data-zone-animation-input="animation"]').val() || effect;
+					if (!$device.first().prop('hidden')) { currentMode = mode; currentEffect = effect; }
+				});
+				$block.find('[data-zone-animation-field="animation"]').prop('hidden', currentMode === 'inherit');
+				$block.find('[data-zone-animation-field="animation_delay"]').prop('hidden', currentMode === 'inherit' || currentMode === 'none' || currentEffect === 'none');
+				$block.find('[data-zone-animation-field="animation_speed"]').prop('hidden', currentMode !== 'custom' || currentEffect !== 'marquee');
+			});
+		}
+		$zoneModal.on('change', '[data-zone-animation-toggle], [data-zone-animation-input="animation"]', function () {
+			const $block = $(this).closest('[data-zone-animation-block]');
+			const device = $(this).closest('[data-device]').attr('data-device');
+			const $device = $block.find('.wp-top-info-bar-admin__responsive-device[data-device="' + device + '"]');
+			const enabled = $device.find('[data-zone-animation-toggle]').prop('checked');
+			const effect = $device.find('[data-zone-animation-input="animation"]').val();
+			$device.find('[data-zone-animation-input="animation_mode"]').val(enabled ? (effect === 'none' ? 'none' : 'custom') : 'inherit').trigger('input');
+			syncZoneAnimationFields();
+		});
+		$(document).on('wpTopInfoBarDeviceChanged', syncZoneAnimationFields);
+		syncZoneAnimationFields();
 		function closeZoneModal() {
 			$zoneModal.find('.wp-top-info-bar-color-pick').each(function () { const picker = $(this).data('pickr'); if (picker) picker.hide(); });
 			$zoneModal.prop('hidden', true); $('body').removeClass('wp-top-info-bar-modal-open');
@@ -400,14 +413,6 @@
 				event.preventDefault(); closeLayoutPicker(true);
 			}
 		});
-		function syncSpacingToggles() {
-			$('[data-spacing-toggle]').each(function () {
-				const $row = $(this).closest('tr');
-				$row.find('[data-spacing-options], .wp-top-info-bar-admin__devices').prop('hidden', !this.checked);
-			});
-		}
-		$('[data-spacing-toggle]').on('change', syncSpacingToggles);
-		syncSpacingToggles();
 		const $list = $('[data-images-list]');
 		const $modal = $('[data-image-modal]');
 		const $owner = $modal.closest('form');
@@ -415,6 +420,11 @@
 		$modal.data('formId', $owner.attr('id')).addClass('wp-top-info-bar-admin').appendTo(document.body);
 		const template = wp.template('wp-top-info-bar-image-row');
 		const $textDelay = $('#wp-top-info-bar-text-delay');
+		function syncAnimationEnabled() {
+			$('.wp-top-info-bar-admin__animation-options').prop('hidden', !$('#wp-top-info-bar-animation-enabled').prop('checked'));
+		}
+		$('#wp-top-info-bar-animation-enabled').on('change', syncAnimationEnabled);
+		syncAnimationEnabled();
 		function syncAnimationDevices() {
 			let animation = 'none';
 			['desktop', 'tablet', 'mobile'].forEach(function (device) {
@@ -436,8 +446,6 @@
 		$list.find('[data-image-row]').each(function () {
 			bindRow($(this));
 		});
-		bindRow($('[data-image-shared]'));
-		$('[data-image-shared]').on('input change', 'input, select', function() { setTimeout(syncGallery, 0); });
 		numberImages();
 
 		$('[data-add-image-row]').on('click', function () {
@@ -454,20 +462,25 @@
 			});
 			frame.open();
 		});
-		$('[data-reset-image-settings]').on('click', function () {
+		$('[data-clone-active-image]').on('click', function () {
 			if (!activeImage) return;
-			const $row = $(activeImage);
-			$row.find('[data-image-override-field], [data-image-override]').val('0');
-			$row.find('[data-override-initialized]').val('1');
-			$row.find('[data-inherited-option]').remove();
-			$row.find('[data-image-position]').val(function () {
-				return $(this).closest('[data-device]').data('device') === 'desktop' ? 'left' : '';
-			});
-			copySharedSettings($row);
-			showImageInheritance($row);
-			if ($row.data('syncOptions')) $row.data('syncOptions')();
-			syncGallery();
-			$row.closest('.wp-top-info-bar-admin').trigger('wpTopInfoBarImagesChanged');
+			const $source = $(activeImage), index = getNextIndex($list);
+			const oldIndex = (/\[images\]\[([^\]]+)\]/.exec($source.find('[data-image-id]').attr('name')) || [])[1];
+			const $copy = $source.clone(false, false).prop('hidden',true);
+			$copy.find('[name]').each(function () { this.name = this.name.replace(/\[images\]\[[^\]]+\]/, '[images][' + index + ']'); });
+			$copy.find('select').each(function (i) { $(this).val($source.find('select').eq(i).val()); });
+			$copy.insertAfter($source); bindRow($copy);
+			window.wpTopInfoBarLayout.cloneAfter('image:' + oldIndex, 'image:' + index);
+			numberImages(); closeImage();
+			$('.wp-top-info-bar-admin').trigger('wpTopInfoBarImagesChanged');
+			setTimeout(function () { $('[data-layout-key="image:' + index + '"]').trigger('focus'); }, 0);
+		});
+		$('[data-remove-active-image]').on('click', function () {
+			if (!activeImage) return;
+			$(activeImage).remove();
+			numberImages();
+			closeImage();
+			$('.wp-top-info-bar-admin').trigger('wpTopInfoBarImagesChanged');
 		});
 		$('[data-close-image-modal]').on('click', closeImage);
 		$(document).on('keydown.wpTopInfoBarModal', function (event) {

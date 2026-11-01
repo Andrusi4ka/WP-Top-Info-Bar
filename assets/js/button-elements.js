@@ -1,4 +1,4 @@
-ï»¿(function ($) {
+﻿(function ($) {
  'use strict';
  $(function () {
   const $modal = $('[data-button-modal]'), $storage = $('[data-button-elements]');
@@ -14,6 +14,17 @@
   $modal.appendTo(document.body);
   function row(id) { return $storage.find('[data-button-element]').filter(function () { return $(this).attr('data-button-element') === id; }).first(); }
   function notify() { $('.wp-top-info-bar-admin').trigger('wpTopInfoBarButtonsChanged').trigger('change'); }
+  function syncChoices() {
+   $modal.find('[data-button-choice]').each(function () {
+    const key=$(this).attr('data-button-choice');
+    $(this).attr('aria-pressed', $controls.filter('[data-button-edit="'+key+'"]').val()===$(this).attr('data-value') ? 'true':'false');
+   });
+  }
+  $modal.on('click','[data-button-choice]',function () {
+   $controls.filter('[data-button-edit="'+$(this).attr('data-button-choice')+'"]').val($(this).attr('data-value')).trigger('change');
+   syncChoices();
+  });
+  $controls.on('change',syncChoices);
   function persist() {
    if (loading || active === null) return;
    $controls.each(function () { row(active).find('[data-button-field="' + $(this).attr('data-button-edit') + '"]').val(this.type === 'checkbox' ? (this.checked ? '1' : '0') : this.value); });
@@ -27,7 +38,7 @@
     if (this.type === 'checkbox') this.checked = value === '1'; else this.value = value;
     if ($(this).hasClass('wp-top-info-bar-color-pick__value')) $(this).closest('.wp-top-info-bar-color-pick').trigger('wpTopInfoBarSetColor',[value]);
    });
-   loading = false;
+   loading = false; syncChoices();
    $modal.prop('hidden',false); $('body').addClass('wp-top-info-bar-modal-open');
    $('#wp-top-info-bar-button-text').trigger('focus');
   }
@@ -41,7 +52,7 @@
   }
   function add(source) {
    const id = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-   const values = {button_text:'',button_size:'default',button_shape:'square',button_style:'filled',button_color:'#2271b1',button_text_color:'#ffffff',button_url:'',button_new_tab:'0',button_position:'text-right'};
+   const values = {button_text:'',button_size:'default',button_size_tablet:'',button_size_mobile:'',button_shape:'square',button_style:'filled',button_color:'#2271b1',button_text_color:'#ffffff',button_url:'',button_new_tab:'0',button_position:'text-right'};
    const $row = $('<div></div>').attr('data-button-element',id).appendTo($storage);
    Object.keys(values).forEach(function (key) { $('<input type="hidden">').attr({'data-button-field':key,name:optionName+'[buttons]['+id+']['+key+']'}).val(values[key]).appendTo($row); });
    const keys = $('[data-layout-tile]').map(function () { return $(this).attr('data-layout-key'); }).get();
@@ -51,6 +62,17 @@
   }
   $controls.on('input change',persist);
   $modal.find('[data-close-button-modal]').on('click',close);
+  $modal.find('[data-clone-button-element]').on('click',function () {
+   if (active === null) return;
+   persist();
+   const source = active, id = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+   const $copy = row(source).clone(false,false).attr('data-button-element',id);
+   $copy.find('[name]').each(function () { this.name = this.name.replace(/\[buttons\]\[[^\]]+\]/, '[buttons][' + id + ']'); });
+   $copy.insertAfter(row(source));
+   window.wpTopInfoBarLayout.cloneAfter('button:' + source, 'button:' + id);
+   notify(); close();
+   setTimeout(function () { $('[data-layout-key="button:' + id + '"]').trigger('focus'); },0);
+  });
   $modal.find('[data-remove-button-element]').on('click',function () {
    const id = active; row(id).remove(); active = null;
    let keys = []; try { keys = JSON.parse($('[data-layout-order]').val() || '[]'); } catch(e) {}

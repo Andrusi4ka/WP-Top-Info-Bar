@@ -1,4 +1,4 @@
-=== WP Top Info Bar ===
+=== WP Top Bar ===
 Contributors: andrusi4ka
 Tags: notification bar, top bar, announcement, banner, promo
 Requires at least: 6.0
@@ -12,7 +12,7 @@ An information bar at the very top of the site: text, colours, spacing, animatio
 
 == Description ==
 
-WP Top Info Bar adds a "Top Info Bar" menu where you set up a bar shown above everything else on the site (through the theme's `wp_body_open` hook).
+WP Top Bar adds a "Top Bar" menu where you set up a bar shown above everything else on the site (through the theme's `wp_body_open` hook).
 
 * Message text, background and text colour.
 * Text size, padding and margin, each with its own value for desktop, tablet (up to 1024px) and phone (up to 767px).
@@ -28,7 +28,7 @@ Bundles [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-che
 
 1. Download `wp-top-info-bar.zip` from the latest release on https://github.com/Andrusi4ka/WP-Top-Info-Bar/releases.
 2. In WordPress go to Plugins > Add New > Upload Plugin and upload the zip, then activate it.
-3. Open "Top Info Bar" in the admin menu, enter the text and tick "Enable bar".
+3. Open "Top Bar" in the admin menu, enter the text and tick "Enable bar".
 
 Later versions are offered under Plugins like any other update.
 

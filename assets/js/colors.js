@@ -1,7 +1,7 @@
 (function($){'use strict';$(function(){var l10n=window.wpTopInfoBarAdmin||{},$box=$('.wp-top-info-bar-admin');
 		var COLOR_PICK = '.wp-top-info-bar-color-pick';
 		var colorI18n = $.extend( {}, l10n.colorPicker || {} );
-		// The palette's colors and names (TinyMCE's map: "RRGGBB", name, â€¦).
+		// The palette's colors and names (TinyMCE's map: "RRGGBB", name, …).
 		var colorSwatches = [];
 		var colorNames = [];
 		( $.isArray( l10n.textColors ) ? l10n.textColors : [] ).forEach( function ( item, i, map ) {

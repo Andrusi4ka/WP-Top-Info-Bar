@@ -29,6 +29,8 @@ final class WP_Top_Info_Bar_Settings {
 			'button_style' => 'filled', 'button_color' => '#2271b1', 'button_text_color' => '#ffffff',
 			'button_url' => '', 'button_new_tab' => 0, 'button_position' => 'text-right',
 			'background_color' => '#1f2937',
+			'border_enabled' => 0, 'border_width' => 2, 'border_width_tablet' => '', 'border_width_mobile' => '', 'border_color' => '#ffffff',
+			'shadow_enabled' => 0, 'shadow_x' => 0, 'shadow_y' => 8, 'shadow_blur' => 20, 'shadow_spread' => 0, 'shadow_color' => 'rgba(0,0,0,0.3)',
 			'text_color'       => '#ffffff',
 			'animation'        => 'none',
 			'animation_enabled' => 1,
@@ -59,9 +61,7 @@ final class WP_Top_Info_Bar_Settings {
 		$post_id = $this->post_id ?: absint(get_option(self::GLOBAL_POST_OPTION, 0));
 		$settings = $post_id ? get_post_meta($post_id, self::META_KEY, true) : get_option(self::OPTION_NAME, array());
 
-		if (! is_array($settings)) {
-			return $this->get_defaults();
-		}
+		if (! is_array($settings)) { $settings = array(); }
 		// First opening of the gallery: use the first legacy image as the
 		// common style; retain different existing images as individual styles.
 		if (! array_key_exists('image_defaults', $settings)) {
@@ -92,13 +92,6 @@ final class WP_Top_Info_Bar_Settings {
 		if (! array_key_exists('animation_enabled', $settings)) {
 			$settings['animation_enabled'] = isset($settings['animation']) && 'none' !== $settings['animation'] ? 1 : 0;
 		}
-		// Convert the former master switch into None selections.
-		if (isset($settings['animation_enabled']) && empty($settings['animation_enabled'])) {
-			$settings['animation'] = 'none';
-			$settings['animation_tablet'] = 'none';
-			$settings['animation_mobile'] = 'none';
-		}
-		$settings['animation_enabled'] = 1;
 		$settings = wp_parse_args($settings, $this->get_defaults());
 		$settings['images'] = is_array($settings['images']) ? $settings['images'] : array();
 		$settings['image_defaults'] = is_array($settings['image_defaults']) ? $settings['image_defaults'] : array();
@@ -125,6 +118,8 @@ final class WP_Top_Info_Bar_Settings {
 		if (isset($settings['texts']['legacy']) && is_array($settings['layout_order'])) {
 			$settings['layout_order'] = array_map(static function ($key) { return 'text' === $key ? 'text:legacy' : $key; }, $settings['layout_order']);
 		}
+		$settings['images'] = $sanitizer->independent_images($settings);
+		$settings['images_independent'] = 1;
 		return $settings;
 	}
 }

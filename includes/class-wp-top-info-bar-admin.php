@@ -8,12 +8,12 @@ final class WP_Top_Info_Bar_Admin {
 	private WP_Top_Info_Bar_Settings $settings;
 	private WP_Top_Info_Bar_Sanitizer $sanitizer;
 	private const SAVE_NONCE = 'wp_top_info_bar_save';
+	private const CLONE_ACTION = 'wp_top_info_bar_clone';
 
 	public function __construct(WP_Top_Info_Bar_Settings $settings, WP_Top_Info_Bar_Sanitizer $sanitizer) {
 		$this->settings = $settings;
 		$this->sanitizer = $sanitizer;
 
-		add_action('admin_menu', array($this, 'register_admin_menu'));
 		add_action('init', array($this, 'register_post_type'));
 		add_action('admin_init', array($this, 'migrate_settings'));
 		add_action('admin_init', array($this, 'register_settings'));
@@ -21,35 +21,37 @@ final class WP_Top_Info_Bar_Admin {
 		add_action('save_post_' . WP_Top_Info_Bar_Settings::POST_TYPE, array($this, 'save'), 10, 2);
 		add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
 		add_filter('parent_file', array($this, 'parent_menu'));
+		add_filter('manage_' . WP_Top_Info_Bar_Settings::POST_TYPE . '_posts_columns', array($this, 'list_columns'));
+		add_action('manage_' . WP_Top_Info_Bar_Settings::POST_TYPE . '_posts_custom_column', array($this, 'list_column'), 10, 2);
+		add_filter('manage_edit-' . WP_Top_Info_Bar_Settings::POST_TYPE . '_sortable_columns', array($this, 'sortable_columns'));
+		add_action('pre_get_posts', array($this, 'list_order'));
+		add_filter('posts_orderby', array($this, 'priority_orderby'), 10, 2);
+		add_filter('wp_insert_post_data', array($this, 'save_priority'), 10, 2);
+		add_action('wp_ajax_wp_top_info_bar_priority', array($this, 'ajax_priority'));
+		add_action('wp_ajax_wp_top_info_bar_toggle', array($this, 'ajax_toggle'));
+		add_filter('post_row_actions', array($this, 'clone_row_action'), 10, 2);
+		add_action('admin_post_' . self::CLONE_ACTION, array($this, 'handle_clone'));
+		add_action('admin_notices', array($this, 'clone_notice'));
 	}
 
 	public function parent_menu($parent) {
 		$screen = get_current_screen();
-		return $screen && WP_Top_Info_Bar_Settings::POST_TYPE === $screen->post_type ? WP_Top_Info_Bar_Settings::MENU_SLUG : $parent;
-	}
-
-	public function register_admin_menu(): void {
-		$hook = add_menu_page(
-			__('Top Info Bar', 'wp-top-info-bar'),
-			__('Top Info Bar', 'wp-top-info-bar'),
-			'manage_options',
-			WP_Top_Info_Bar_Settings::MENU_SLUG,
-			array($this, 'render_settings_page'),
-			'dashicons-megaphone',
-			81
-		);
-		add_action('load-' . $hook, array($this, 'open_editor'));
+		return $screen && WP_Top_Info_Bar_Settings::POST_TYPE === $screen->post_type ? 'edit.php?post_type=' . WP_Top_Info_Bar_Settings::POST_TYPE : $parent;
 	}
 
 	public function register_post_type(): void {
 		register_post_type(WP_Top_Info_Bar_Settings::POST_TYPE, array(
 			'labels' => array(
-				'name' => __('Top Info Bar', 'wp-top-info-bar'),
-				'singular_name' => __('Top Info Bar', 'wp-top-info-bar'),
-				'edit_item' => __('Edit Top Info Bar', 'wp-top-info-bar'),
-				'add_new_item' => __('Add Top Info Bar', 'wp-top-info-bar'),
+				'name' => __('Top Bars', 'wp-top-info-bar'),
+				'menu_name' => __('WP Top Bar', 'wp-top-info-bar'),
+				'all_items' => __('All Top Bars', 'wp-top-info-bar'),
+				'add_new' => __('Add New', 'wp-top-info-bar'),
+				'singular_name' => __('Top Bar', 'wp-top-info-bar'),
+				'edit_item' => __('Edit Top Bar', 'wp-top-info-bar'),
+				'add_new_item' => __('Add Top Bar', 'wp-top-info-bar'),
 			),
-			'public' => false, 'show_ui' => true, 'show_in_menu' => false,
+			'public' => false, 'show_ui' => true, 'show_in_menu' => true,
+			'menu_icon' => 'dashicons-megaphone', 'menu_position' => 81,
 			'show_in_rest' => false, 'supports' => array('title'),
 			'capabilities' => array(
 				'edit_post' => 'manage_options', 'read_post' => 'manage_options', 'delete_post' => 'manage_options',
@@ -66,7 +68,7 @@ final class WP_Top_Info_Bar_Admin {
 		if (! current_user_can('manage_options') || get_option(WP_Top_Info_Bar_Settings::GLOBAL_POST_OPTION, 0)) {
 			return;
 		}
-		$id = wp_insert_post(array('post_type' => WP_Top_Info_Bar_Settings::POST_TYPE, 'post_title' => __('Top Info Bar', 'wp-top-info-bar'), 'post_status' => 'publish'), true);
+		$id = wp_insert_post(array('post_type' => WP_Top_Info_Bar_Settings::POST_TYPE, 'post_title' => __('Top Bar', 'wp-top-info-bar'), 'post_status' => 'publish'), true);
 		if (is_wp_error($id) || ! $id) {
 			return;
 		}
@@ -74,20 +76,141 @@ final class WP_Top_Info_Bar_Admin {
 		update_option(WP_Top_Info_Bar_Settings::GLOBAL_POST_OPTION, $id, false);
 	}
 
-	public function open_editor(): void {
-		$id = absint(get_option(WP_Top_Info_Bar_Settings::GLOBAL_POST_OPTION, 0));
-		$post = $id ? get_post($id) : null;
-		$url = $post && WP_Top_Info_Bar_Settings::POST_TYPE === $post->post_type && 'trash' !== $post->post_status
-			? admin_url('post.php?post=' . $id . '&action=edit')
-			: admin_url('edit.php?post_type=' . WP_Top_Info_Bar_Settings::POST_TYPE);
-		wp_safe_redirect($url);
-		exit;
-	}
-
 	public function add_meta_boxes(): void {
 		add_meta_box('wp-top-info-bar-layout', __('Layout', 'wp-top-info-bar'), array($this, 'render_layout_box'), null, 'normal', 'high');
 		add_meta_box('wp-top-info-bar-settings', __('Bar settings', 'wp-top-info-bar'), array($this, 'render_settings_box'), null, 'normal', 'default');
+		add_meta_box('wp-top-info-bar-priority', __('Display priority', 'wp-top-info-bar'), array($this, 'render_priority_box'), null, 'side', 'default');
 		add_meta_box('wp-top-info-bar-shortcode', __('Shortcode', 'wp-top-info-bar'), array($this, 'render_shortcode_box'), null, 'side', 'high');
+	}
+
+	private static function priority($value): int {
+		return max(1, min(9999, is_scalar($value) ? absint($value) : 1));
+	}
+
+	public function render_priority_box($post): void {
+		echo '<label for="wp-top-info-bar-priority">' . esc_html__('Priority', 'wp-top-info-bar') . '</label> ';
+		echo '<input type="number" id="wp-top-info-bar-priority" class="small-text" name="wp_top_info_bar_priority" min="1" max="9999" step="1" value="' . esc_attr((string) self::priority($post->menu_order)) . '">';
+		echo '<p class="description">' . esc_html__('Lower numbers appear higher. Only published, enabled bars are displayed.', 'wp-top-info-bar') . '</p>';
+	}
+
+	public function save_priority(array $data, array $postarr): array {
+		if (WP_Top_Info_Bar_Settings::POST_TYPE !== $data['post_type'] || ! isset($_POST['wp_top_info_bar_priority'])) { return $data; }
+		$nonce = $_POST[self::SAVE_NONCE . '_nonce'] ?? '';
+		if (! is_string($nonce) || ! wp_verify_nonce($nonce, self::SAVE_NONCE) || ! current_user_can('manage_options')) { return $data; }
+		if (! empty($postarr['ID']) && ! current_user_can('edit_post', (int) $postarr['ID'])) { return $data; }
+		$data['menu_order'] = self::priority(wp_unslash($_POST['wp_top_info_bar_priority']));
+		return $data;
+	}
+
+	public function list_columns(array $columns): array {
+		$out = array();
+		foreach ($columns as $key => $label) {
+			$out[$key] = $label;
+			if ('title' === $key) { $out['wp_top_info_bar_priority'] = __('Priority', 'wp-top-info-bar'); $out['wp_top_info_bar_shortcode'] = __('Shortcode', 'wp-top-info-bar'); $out['wp_top_info_bar_enabled'] = __('Enabled', 'wp-top-info-bar'); }
+		}
+		return $out;
+	}
+
+	public function list_column(string $column, int $post_id): void {
+		if ('wp_top_info_bar_priority' === $column) {
+			$post = get_post($post_id);
+			echo '<div class="wp-top-info-bar-priority-row" data-priority-row="' . (int) $post_id . '"><label class="screen-reader-text" for="top-bar-priority-' . (int) $post_id . '">' . esc_html__('Priority', 'wp-top-info-bar') . '</label><input type="number" id="top-bar-priority-' . (int) $post_id . '" class="small-text" data-priority-input min="1" max="9999" step="1" value="' . (int) self::priority($post->menu_order) . '"> <button type="button" class="button button-small" data-save-priority>' . esc_html__('Save', 'wp-top-info-bar') . '</button><span class="description" data-priority-status aria-live="polite"></span></div>';
+		} elseif ('wp_top_info_bar_enabled' === $column) {
+			$settings = (new WP_Top_Info_Bar_Settings($post_id))->get_settings();
+			echo '<label class="wp-top-info-bar-list-switch"><input type="checkbox" data-toggle-bar data-post-id="' . (int) $post_id . '" aria-label="' . esc_attr__('Enable Top Bar', 'wp-top-info-bar') . '"' . checked(! empty($settings['enabled']), true, false) . '></label><span class="description" data-toggle-status aria-live="polite"></span>';
+		} elseif ('wp_top_info_bar_shortcode' === $column) {
+			echo '<input type="text" class="wp-top-info-bar-list-shortcode" data-copy-shortcode readonly aria-label="' . esc_attr__('Copy shortcode', 'wp-top-info-bar') . '" value="' . esc_attr('[wp_top_info_bar id="' . $post_id . '"]') . '">';
+		}
+	}
+
+	public function sortable_columns(array $columns): array { $columns['wp_top_info_bar_priority'] = 'wp_top_info_bar_priority'; return $columns; }
+
+	public function list_order($query): void {
+		if (is_admin() && $query->is_main_query() && WP_Top_Info_Bar_Settings::POST_TYPE === $query->get('post_type') && ! $query->get('orderby')) { $query->set('orderby', 'wp_top_info_bar_priority'); $query->set('order', 'ASC'); }
+	}
+
+	public function priority_orderby(string $orderby, $query): string {
+		if (! is_admin() || ! $query->is_main_query() || WP_Top_Info_Bar_Settings::POST_TYPE !== $query->get('post_type') || 'wp_top_info_bar_priority' !== $query->get('orderby')) { return $orderby; }
+		global $wpdb;
+		$order = 'DESC' === strtoupper((string) $query->get('order')) ? 'DESC' : 'ASC';
+		return "GREATEST(1, {$wpdb->posts}.menu_order) {$order}, {$wpdb->posts}.ID ASC";
+	}
+
+	public function ajax_priority(): void {
+		check_ajax_referer('wp_top_info_bar_priority', 'nonce');
+		$id = isset($_POST['post_id']) && is_scalar($_POST['post_id']) ? absint($_POST['post_id']) : 0;
+		if (! $id || WP_Top_Info_Bar_Settings::POST_TYPE !== get_post_type($id) || ! current_user_can('manage_options') || ! current_user_can('edit_post', $id)) { wp_send_json_error(array('message' => __('You cannot edit this bar.', 'wp-top-info-bar')), 403); }
+		if (! isset($_POST['priority']) || ! is_scalar($_POST['priority'])) { wp_send_json_error(array('message' => __('Enter a priority number.', 'wp-top-info-bar')), 400); }
+		$priority = self::priority(wp_unslash($_POST['priority']));
+		$result = wp_update_post(array('ID' => $id, 'menu_order' => $priority), true);
+		if (is_wp_error($result)) { wp_send_json_error(array('message' => __('Could not save priority.', 'wp-top-info-bar')), 500); }
+		wp_send_json_success(array('priority' => $priority));
+	}
+
+	public function ajax_toggle(): void {
+		check_ajax_referer('wp_top_info_bar_toggle', 'nonce');
+		$id = isset($_POST['post_id']) && is_scalar($_POST['post_id']) ? absint($_POST['post_id']) : 0;
+		if (! $id || WP_Top_Info_Bar_Settings::POST_TYPE !== get_post_type($id) || ! current_user_can('manage_options') || ! current_user_can('edit_post', $id)) { wp_send_json_error(array('message' => __('You cannot edit this bar.', 'wp-top-info-bar')), 403); }
+		if (! isset($_POST['enabled']) || ! is_scalar($_POST['enabled']) || ! in_array((string) $_POST['enabled'], array('0', '1'), true)) { wp_send_json_error(array('message' => __('Invalid enabled state.', 'wp-top-info-bar')), 400); }
+		$settings = get_post_meta($id, WP_Top_Info_Bar_Settings::META_KEY, true);
+		if (! is_array($settings)) { $settings = (new WP_Top_Info_Bar_Settings($id))->get_settings(); }
+		$settings['enabled'] = (int) $_POST['enabled'];
+		update_post_meta($id, WP_Top_Info_Bar_Settings::META_KEY, wp_slash($settings));
+		$saved = get_post_meta($id, WP_Top_Info_Bar_Settings::META_KEY, true);
+		if (! is_array($saved) || (int) ($saved['enabled'] ?? -1) !== $settings['enabled']) { wp_send_json_error(array('message' => __('Could not update the bar.', 'wp-top-info-bar')), 500); }
+		wp_send_json_success(array('enabled' => $settings['enabled']));
+	}
+
+	public function can_clone($post): bool {
+		if (! $post || WP_Top_Info_Bar_Settings::POST_TYPE !== $post->post_type || 'trash' === $post->post_status) { return false; }
+		$type = get_post_type_object(WP_Top_Info_Bar_Settings::POST_TYPE);
+		return current_user_can('edit_post', $post->ID) && current_user_can($type->cap->create_posts);
+	}
+
+	public function clone_bar(int $post_id): int {
+		$post = get_post($post_id);
+		if (! $this->can_clone($post)) { return 0; }
+		$id = wp_insert_post(wp_slash(array(
+			'post_type' => WP_Top_Info_Bar_Settings::POST_TYPE,
+			'post_status' => 'draft',
+			'post_title' => trim(sprintf(__('%s (copy)', 'wp-top-info-bar'), $post->post_title)),
+			'post_author' => get_current_user_id(),
+			'menu_order' => $post->menu_order,
+		)), true);
+		if (is_wp_error($id) || ! $id) { return 0; }
+		$settings = get_post_meta($post_id, WP_Top_Info_Bar_Settings::META_KEY, true);
+		if (! is_array($settings)) { $settings = (new WP_Top_Info_Bar_Settings($post_id))->get_settings(); }
+		// Keep explicitly assigned HTML IDs unique if both bars are published later.
+		if (! empty($settings['custom_id'])) { $settings['custom_id'] .= '-copy-' . $id; }
+		if (false === update_post_meta($id, WP_Top_Info_Bar_Settings::META_KEY, wp_slash($settings))) { wp_delete_post($id, true); return 0; }
+		return (int) $id;
+	}
+
+	public function clone_row_action(array $actions, $post): array {
+		if (! $this->can_clone($post)) { return $actions; }
+		$url = wp_nonce_url(add_query_arg(array('action' => self::CLONE_ACTION, 'post' => $post->ID), admin_url('admin-post.php')), self::CLONE_ACTION . '_' . $post->ID);
+		$link = '<a href="' . esc_url($url) . '" aria-label="' . esc_attr(sprintf(__('Clone %s', 'wp-top-info-bar'), _draft_or_post_title($post))) . '">' . esc_html__('Clone', 'wp-top-info-bar') . '</a>';
+		$out = array();
+		foreach ($actions as $key => $action) { $out[$key] = $action; if ('inline hide-if-no-js' === $key) { $out['wp_top_info_bar_clone'] = $link; } }
+		if (! isset($out['wp_top_info_bar_clone'])) { $out = isset($out['edit']) ? array_merge(array('edit' => $out['edit'], 'wp_top_info_bar_clone' => $link), $out) : array('wp_top_info_bar_clone' => $link) + $out; }
+		return $out;
+	}
+
+	public function handle_clone(): void {
+		$id = isset($_GET['post']) && is_scalar($_GET['post']) ? absint($_GET['post']) : 0;
+		check_admin_referer(self::CLONE_ACTION . '_' . $id);
+		$copy = $this->clone_bar($id);
+		if (! $copy) { wp_die(esc_html__('Could not clone this Top Bar.', 'wp-top-info-bar'), '', array('response' => 403, 'back_link' => true)); }
+		wp_safe_redirect(add_query_arg(array('post_type' => WP_Top_Info_Bar_Settings::POST_TYPE, 'wp_top_info_bar_cloned' => $copy), admin_url('edit.php')));
+		exit;
+	}
+
+	public function clone_notice(): void {
+		$screen = get_current_screen();
+		if (! $screen || 'edit-' . WP_Top_Info_Bar_Settings::POST_TYPE !== $screen->id || empty($_GET['wp_top_info_bar_cloned']) || ! is_scalar($_GET['wp_top_info_bar_cloned'])) { return; }
+		$id = absint($_GET['wp_top_info_bar_cloned']); $post = get_post($id);
+		if (! $post || WP_Top_Info_Bar_Settings::POST_TYPE !== $post->post_type || ! current_user_can('edit_post', $id)) { return; }
+		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Top Bar cloned as a draft.', 'wp-top-info-bar') . ' <a href="' . esc_url(get_edit_post_link($id, 'raw')) . '">' . esc_html__('Edit copy', 'wp-top-info-bar') . '</a></p></div>';
 	}
 
 	public function render_shortcode_box($post): void {
@@ -151,7 +274,7 @@ final class WP_Top_Info_Bar_Admin {
 				'tooltip' => __('Text scrolling speed in pixels per second. Higher values move faster.', 'wp-top-info-bar'),
 			),
 			'text_delay'       => array(
-				'label'    => __('Text delay', 'wp-top-info-bar'),
+				'label'    => __('Delay', 'wp-top-info-bar'),
 				'callback' => 'render_text_delay_field',
 				'tooltip'  => __('Set when the text animation should start. You can enter 2000, 2000ms or 2s. A plain number is treated as milliseconds.', 'wp-top-info-bar'),
 			),
@@ -187,10 +310,11 @@ final class WP_Top_Info_Bar_Admin {
 			if ('background_color' === $id) { $page = 'background'; }
 			if ('images' === $id) { $page = 'pictures'; }
 			$title = $this->get_settings_field_title_markup($field['label'], $field['tooltip']);
+			if ('background_color' === $id) { $title = esc_html($field['label']); }
 			if (in_array($id, array('padding', 'margin'), true)) {
 				$enabled = ! empty($this->settings->get_settings()[$id . '_enabled']);
 				$name = WP_Top_Info_Bar_Settings::OPTION_NAME . '[' . $id . '_enabled]';
-				$title = '<div class="wp-top-info-bar-admin__switch"><input type="hidden" name="' . esc_attr($name) . '" value="0"><label><input type="checkbox" data-spacing-toggle="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="1"' . checked($enabled, true, false) . '> ' . esc_html($field['label']) . '</label>' . $this->get_tooltip_markup($field['tooltip'], $field['label']) . '</div>';
+				$title = '<div class="wp-top-info-bar-admin__switch"><input type="hidden" name="' . esc_attr($name) . '" value="0"><label><input type="checkbox" data-spacing-toggle="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="1"' . checked($enabled, true, false) . '> ' . esc_html($field['label']) . '</label></div>';
 			}
 			if (in_array($id, array('font_size', 'padding', 'margin', 'animation', 'text_delay', 'marquee_speed'), true)) {
 				$title .= '<span class="wp-top-info-bar-admin__devices" role="group" aria-label="' . esc_attr($field['label'] . ' ? ' . __('Device', 'wp-top-info-bar')) . '">';
@@ -213,14 +337,11 @@ final class WP_Top_Info_Bar_Admin {
 	private static function pages(): array {
 		return array(
 			'generell' => array(__('Generell', 'wp-top-info-bar'), 'dashicons-admin-generic'),
-			'animation' => array(__('Animation', 'wp-top-info-bar'), 'dashicons-controls-play'),
-			'pictures' => array(__('Pictures', 'wp-top-info-bar'), 'dashicons-format-gallery'),
-			'custom' => array(__('Custom', 'wp-top-info-bar'), 'dashicons-editor-code'),
 		);
 	}
 
 	public function render_settings_page(): void {
-		echo '<div class="wrap"><p>' . esc_html__('Open the Top Info Bar editor to change its settings.', 'wp-top-info-bar') . '</p></div>';
+		echo '<div class="wrap"><p>' . esc_html__('Open the Top Bar editor to change its settings.', 'wp-top-info-bar') . '</p></div>';
 	}
 
 	public function render_layout_box($post): void {
@@ -261,15 +382,11 @@ final class WP_Top_Info_Bar_Admin {
 		wp_nonce_field(self::SAVE_NONCE, self::SAVE_NONCE . '_nonce');
 		?>
 		<div class="wp-top-info-bar-settings">
-		<?php $this->render_text_elements(); $this->render_button_elements(); $this->render_zone_settings_modal(); ?>
-				<div class="wp-top-info-bar-admin">
-				<nav class="wp-top-info-bar-admin__menu" aria-label="<?php esc_attr_e('Bar settings', 'wp-top-info-bar'); ?>">
-				<div class="wp-top-info-bar-admin__switch wp-top-info-bar-admin__enable"><?php $this->render_enabled_field(); ?></div>
-				<?php foreach (self::pages() as $page => $meta) : ?>
-					<button type="button" class="wp-top-info-bar-admin__menu-item" data-page="<?php echo esc_attr($page); ?>" aria-controls="wp-top-info-bar-page-<?php echo esc_attr($page); ?>" aria-current="<?php echo 'generell' === $page ? 'true' : 'false'; ?>"><span class="dashicons <?php echo esc_attr($meta[1]); ?>" aria-hidden="true"></span><span><?php echo esc_html($meta[0]); ?></span></button>
-				<?php endforeach; ?>
-				</nav>
+		<?php $this->render_text_elements(); $this->render_button_elements(); $this->render_zone_settings_modal(); $this->render_images_field(); ?>
+				<div class="wp-top-info-bar-admin wp-top-info-bar-workspace">
+				
 				<div class="wp-top-info-bar-admin__settings">
+				<div class="wp-top-info-bar-admin__switch wp-top-info-bar-admin__enable"><?php $this->render_enabled_field(); ?></div>
 				<?php foreach (self::pages() as $page => $meta) : ?>
 					<fieldset class="wp-top-info-bar-admin__page" id="wp-top-info-bar-page-<?php echo esc_attr($page); ?>" data-page="<?php echo esc_attr($page); ?>"<?php echo 'generell' === $page ? '' : ' hidden'; ?>>
 						<legend><?php echo esc_html($meta[0]); ?></legend>
@@ -279,18 +396,23 @@ final class WP_Top_Info_Bar_Admin {
 						<h3 id="wp-top-info-bar-appearance-heading"><?php esc_html_e('Appearance', 'wp-top-info-bar'); ?></h3>
 						<div class="wp-top-info-bar-admin__background-block"><table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_background'); ?></tbody></table></div>
 						<div class="wp-top-info-bar-admin__spacing-block"><table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_spacing'); ?></tbody></table></div>
+						<?php $this->render_bar_decoration_fields(); ?>
 						</section>
-						<?php elseif ('animation' === $page) : ?>
-						<div class="wp-top-info-bar-admin__animation-block">
-							<input type="hidden" name="<?php echo esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME); ?>[animation_enabled]" value="1">
-							<div class="wp-top-info-bar-admin__animation-options">
+						<div class="wp-top-info-bar-admin__animation-block wp-top-info-bar-admin__general-block">
+						<div class="wp-top-info-bar-admin__switch">
+							<input type="hidden" name="<?php echo esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME); ?>[animation_enabled]" value="0">
+							<label><input type="checkbox" id="wp-top-info-bar-animation-enabled" name="<?php echo esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME); ?>[animation_enabled]" value="1" <?php checked(! empty($this->settings->get_settings()['animation_enabled'])); ?>> <?php esc_html_e('Animation', 'wp-top-info-bar'); ?></label>
+						</div>
+							<div class="wp-top-info-bar-admin__animation-options"<?php echo empty($this->settings->get_settings()['animation_enabled']) ? ' hidden' : ''; ?>>
 								<table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_animation'); ?></tbody></table>
 							</div>
 						</div>
-						<?php elseif ('pictures' === $page) : ?>
-						<?php $this->render_images_field(); ?>
+						<section class="wp-top-info-bar-admin__general-block wp-top-info-bar-admin__custom" aria-labelledby="wp-top-info-bar-custom-heading">
+						<h3 id="wp-top-info-bar-custom-heading"><?php esc_html_e('Custom', 'wp-top-info-bar'); ?></h3>
+						<table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_custom'); ?></tbody></table>
+						</section>
 						<?php endif; ?>
-						<?php if (! in_array($page, array('generell', 'pictures', 'animation'), true)) : ?>
+						<?php if (! in_array($page, array('generell'), true)) : ?>
 						<table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_' . $page); ?></tbody></table>
 						<?php endif; ?>
 					</fieldset>
@@ -304,6 +426,12 @@ final class WP_Top_Info_Bar_Admin {
 
 	public function enqueue_admin_assets(string $hook_suffix): void {
 		$screen = get_current_screen();
+		if ($screen && WP_Top_Info_Bar_Settings::POST_TYPE === $screen->post_type && 'edit.php' === $hook_suffix) {
+			wp_enqueue_style('wp-top-info-bar-list', WP_TOP_INFO_BAR_URL . 'assets/css/list.css', array(), (string) filemtime(WP_TOP_INFO_BAR_PATH . 'assets/css/list.css'));
+			wp_enqueue_script('wp-top-info-bar-list', WP_TOP_INFO_BAR_URL . 'assets/js/list.js', array('jquery'), (string) filemtime(WP_TOP_INFO_BAR_PATH . 'assets/js/list.js'), true);
+			wp_localize_script('wp-top-info-bar-list', 'wpTopInfoBarList', array('toggleNonce' => wp_create_nonce('wp_top_info_bar_toggle'), 'toggleError' => __('Could not update the bar.', 'wp-top-info-bar'), 'nonce' => wp_create_nonce('wp_top_info_bar_priority'), 'saved' => __('Saved', 'wp-top-info-bar'), 'copied' => __('Copied!', 'wp-top-info-bar'), 'error' => __('Could not save priority.', 'wp-top-info-bar')));
+			return;
+		}
 		if (! $screen || WP_Top_Info_Bar_Settings::POST_TYPE !== $screen->post_type || ! in_array($hook_suffix, array('post.php', 'post-new.php'), true)) {
 			return;
 		}
@@ -364,6 +492,29 @@ final class WP_Top_Info_Bar_Admin {
 		);
 	}
 
+	private function render_bar_decoration_fields(): void {
+		$values = $this->settings->get_settings(); $prefix = WP_Top_Info_Bar_Settings::OPTION_NAME;
+		foreach (array('border' => __('Bottom border', 'wp-top-info-bar'), 'shadow' => __('Shadow', 'wp-top-info-bar')) as $kind => $label) : ?>
+		<div class="wp-top-info-bar-decoration">
+			<div class="wp-top-info-bar-admin__switch"><input type="hidden" name="<?php echo esc_attr($prefix . '[' . $kind . '_enabled]'); ?>" value="0"><label><input type="checkbox" data-bar-decoration="<?php echo esc_attr($kind); ?>" name="<?php echo esc_attr($prefix . '[' . $kind . '_enabled]'); ?>" value="1"<?php checked(! empty($values[$kind . '_enabled'])); ?>> <?php echo esc_html($label); ?></label></div>
+			<div class="wp-top-info-bar-decoration__options" data-bar-decoration-options="<?php echo esc_attr($kind); ?>"<?php echo empty($values[$kind . '_enabled']) ? ' hidden' : ''; ?>>
+			<?php if ('border' === $kind) : ?>
+			<div class="wp-top-info-bar-decoration__border-width"><?php $this->image_device_heading(__('Width (px)', 'wp-top-info-bar'), __('Bottom border thickness in pixels. Set 0 to hide it. Empty tablet and mobile fields inherit the value from the larger screen.', 'wp-top-info-bar')); ?>
+			<?php foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) : ?>
+			<div class="wp-top-info-bar-admin__responsive-device" data-device="<?php echo esc_attr($device); ?>"<?php echo '' === $suffix ? '' : ' hidden'; ?>><input type="number" min="0" max="50" step="any" class="regular-text" name="<?php echo esc_attr($prefix . '[border_width' . $suffix . ']'); ?>" value="<?php echo esc_attr((string) $values['border_width' . $suffix]); ?>" placeholder="<?php echo '' === $suffix ? '2' : 'Inherit'; ?>"></div>
+			<?php endforeach; ?></div>
+			<?php else : ?>
+			<div class="wp-top-info-bar-decoration__shadow-values">
+			<?php foreach (array('shadow_x' => __('Horizontal (px)', 'wp-top-info-bar'), 'shadow_y' => __('Vertical (px)', 'wp-top-info-bar'), 'shadow_blur' => __('Blur radius (px)', 'wp-top-info-bar'), 'shadow_spread' => __('Spread radius (px)', 'wp-top-info-bar')) as $key => $name) : ?>
+			<label><?php echo esc_html($name); ?><input type="number" class="regular-text" name="<?php echo esc_attr($prefix . '[' . $key . ']'); ?>" value="<?php echo esc_attr((string) $values[$key]); ?>" min="<?php echo 'shadow_blur' === $key ? '0' : ('shadow_spread' === $key ? '-50' : '-100'); ?>" max="<?php echo 'shadow_spread' === $key ? '50' : '100'; ?>" step="any"></label>
+			<?php endforeach; ?></div>
+			<?php endif; ?>
+			<div class="wp-top-info-bar-decoration__color"><label><?php esc_html_e('Color', 'wp-top-info-bar'); ?></label><?php $this->color($kind . '_color', $values[$kind . '_color'], 'border' === $kind ? '#ffffff' : 'rgba(0,0,0,0.3)'); ?></div>
+			</div>
+		</div>
+		<?php endforeach;
+	}
+
 	private function render_zone_settings_modal(): void {
 		$settings = $this->settings->get_settings();
 		$zones = (new WP_Top_Info_Bar_Sanitizer())->sanitize_zone_settings($settings['zone_settings']);
@@ -375,12 +526,51 @@ final class WP_Top_Info_Bar_Admin {
 				<div class="wp-top-info-bar-image-modal__body">
 				<?php foreach (array('left', 'center', 'right') as $zone) : $values = $zones[$zone] ?? array(); $prefix = WP_Top_Info_Bar_Settings::OPTION_NAME . '[zone_settings][' . $zone . ']'; ?>
 					<div data-zone-settings="<?php echo esc_attr($zone); ?>" hidden>
+						<div class="wp-top-info-bar-zone-modal__appearance">
+
+						<div class="wp-top-info-bar-zone-modal__row">
+						<div class="wp-top-info-bar-zone-modal__field">
+						<?php $this->image_device_heading(__('Width', 'wp-top-info-bar'), __('Use px, %, or auto. A number without a unit is pixels. Empty tablet/mobile fields inherit from the larger screen.', 'wp-top-info-bar')); ?>
+						<?php foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) : ?>
+						<div class="wp-top-info-bar-admin__responsive-device" data-device="<?php echo esc_attr($device); ?>"<?php echo 'desktop' === $device ? '' : ' hidden'; ?>><input type="text" class="regular-text" name="<?php echo esc_attr($prefix . '[width' . $suffix . ']'); ?>" value="<?php echo esc_attr($values['width' . $suffix] ?? ''); ?>" placeholder="<?php echo 'desktop' === $device ? ('center' === $zone ? 'Fill available space' : 'auto') : 'Inherit'; ?>" aria-label="<?php echo esc_attr(sprintf(__('Zone width: %s', 'wp-top-info-bar'), $device)); ?>"></div>
+						<?php endforeach; ?>
+						</div>
 						<div class="wp-top-info-bar-zone-modal__field"><label><?php esc_html_e('Background', 'wp-top-info-bar'); ?></label><?php $this->color('zone_settings][' . $zone . '][background_color', $values['background_color'] ?? 'rgba(0,0,0,0)', 'rgba(0,0,0,0)'); ?></div>
+						</div>
 						<?php foreach (array('padding' => __('Padding', 'wp-top-info-bar'), 'margin' => __('Margin', 'wp-top-info-bar')) as $key => $label) : ?>
 						<div class="wp-top-info-bar-zone-modal__field wp-top-info-bar-field-<?php echo esc_attr($key); ?>">
-						<?php $this->image_device_heading($label, ''); $this->spacing_fields($key, $values, $prefix); ?>
+						<?php $enabled = ! empty($values[$key . '_enabled']); ?>
+						<?php $toggle = '<div class="wp-top-info-bar-admin__switch"><input type="hidden" name="' . esc_attr($prefix . '[' . $key . '_enabled]') . '" value="0"><label><input type="checkbox" data-zone-spacing-toggle name="' . esc_attr($prefix . '[' . $key . '_enabled]') . '" value="1"' . checked($enabled, true, false) . '> ' . esc_html($label) . '</label></div>'; $this->image_device_heading($label, '', $toggle); ?>
+						<div data-zone-spacing-options<?php echo $enabled ? '' : ' hidden'; ?>><?php $this->spacing_fields($key, $values, $prefix); ?></div>
 						</div>
 						<?php endforeach; ?>
+						</div>
+						<div class="wp-top-info-bar-zone-modal__field" data-zone-animation-block>
+						
+						<?php $effects = array('none' => __('None', 'wp-top-info-bar'), 'fade-in' => __('Fade in', 'wp-top-info-bar'), 'slide-up' => __('Slide up', 'wp-top-info-bar'), 'from-left' => __('Fade from left', 'wp-top-info-bar'), 'from-right' => __('Fade from right', 'wp-top-info-bar'), 'page-left' => __('Slide from page left', 'wp-top-info-bar'), 'page-right' => __('Slide from page right', 'wp-top-info-bar'), 'blink' => __('Blink', 'wp-top-info-bar'), 'scale-pulse' => __('Scale up', 'wp-top-info-bar'), 'marquee' => __('Marquee', 'wp-top-info-bar'));
+						foreach (array('animation_mode' => __('Animation', 'wp-top-info-bar'), 'animation' => __('Animation', 'wp-top-info-bar'), 'animation_speed' => __('Speed (px/s)', 'wp-top-info-bar'), 'animation_delay' => __('Delay', 'wp-top-info-bar')) as $key => $label) : ?>
+						<div class="wp-top-info-bar-zone-animation-field" data-zone-animation-field="<?php echo esc_attr($key); ?>">
+						<?php $this->image_device_heading($label, ''); ?>
+						<?php foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) : $value = $values[$key . $suffix] ?? ('' === $suffix ? ('animation_mode' === $key ? 'inherit' : ('animation' === $key ? 'fade-in' : ('animation_speed' === $key ? '60' : ''))) : ''); ?>
+						<div class="wp-top-info-bar-admin__responsive-device" data-device="<?php echo esc_attr($device); ?>"<?php echo 'desktop' === $device ? '' : ' hidden'; ?>>
+						<?php if ('animation_mode' === $key) :
+						$resolved_mode = $values['animation_mode'] ?? 'inherit';
+						foreach (array('_tablet', '_mobile') as $mode_suffix) { if ('' === $suffix) { break; } if (! empty($values['animation_mode' . $mode_suffix])) { $resolved_mode = $values['animation_mode' . $mode_suffix]; } if ($suffix === $mode_suffix) { break; } }
+						?>
+						<input type="hidden" name="<?php echo esc_attr($prefix . '[' . $key . $suffix . ']'); ?>" data-zone-animation-input="animation_mode" value="<?php echo esc_attr($resolved_mode); ?>">
+						<div class="wp-top-info-bar-admin__switch"><label><input type="checkbox" data-zone-animation-toggle<?php checked('inherit' !== $resolved_mode); ?>> <?php esc_html_e('Enable zone animation', 'wp-top-info-bar'); ?></label></div>
+						<p class="description"><?php esc_html_e('When disabled, the zone inherits the main bar animation (Inherit).', 'wp-top-info-bar'); ?></p>
+						<?php elseif ('animation' === $key) : ?>
+						<select name="<?php echo esc_attr($prefix . '[' . $key . $suffix . ']'); ?>" data-zone-animation-input="<?php echo esc_attr($key); ?>">
+						<?php if ('' !== $suffix) : ?><option value=""<?php selected($value, ''); ?>><?php esc_html_e('Same as larger screen', 'wp-top-info-bar'); ?></option><?php endif; ?>
+						<?php $effect_mode = $values['animation_mode'] ?? 'inherit'; foreach (array('_tablet', '_mobile') as $mode_suffix) { if ('' === $suffix) { break; } if (! empty($values['animation_mode' . $mode_suffix])) { $effect_mode = $values['animation_mode' . $mode_suffix]; } if ($suffix === $mode_suffix) { break; } } if ('none' === $effect_mode) { $value = 'none'; } foreach ($effects as $option => $text) : ?><option value="<?php echo esc_attr($option); ?>"<?php selected($value, $option); ?>><?php echo esc_html($text); ?></option><?php endforeach; ?>
+						</select>
+						<?php else : ?><input class="regular-text" type="<?php echo 'animation_speed' === $key ? 'number' : 'text'; ?>" name="<?php echo esc_attr($prefix . '[' . $key . $suffix . ']'); ?>" value="<?php echo esc_attr((string) $value); ?>" placeholder="<?php echo '' === $suffix ? ('animation_speed' === $key ? '60' : '0s') : 'Inherit'; ?>"<?php echo 'animation_speed' === $key ? ' min="1" max="1000" step="any"' : ''; ?>><?php endif; ?>
+						</div>
+						<?php endforeach; ?>
+						</div>
+						<?php endforeach; ?>
+						</div>
 					</div>
 				<?php endforeach; ?>
 				</div>
@@ -407,7 +597,7 @@ final class WP_Top_Info_Bar_Admin {
 			<div class="wp-top-info-bar-image-modal__backdrop" data-close-text-modal></div>
 			<div class="wp-top-info-bar-image-modal__panel">
 				<div class="wp-top-info-bar-image-modal__header"><h2 id="wp-top-info-bar-text-modal-title"><?php esc_html_e('Text', 'wp-top-info-bar'); ?></h2><button type="button" class="wp-top-info-bar-image-modal__close" data-close-text-modal aria-label="<?php esc_attr_e('Close', 'wp-top-info-bar'); ?>"><span class="dashicons dashicons-no-alt" aria-hidden="true"></span></button></div>
-				<div class="wp-top-info-bar-image-modal__body">
+				<div class="wp-top-info-bar-image-modal__body"><div class="wp-top-info-bar-text-modal__settings">
 					<div class="wp-top-info-bar-text-modal__field"><label for="wp-top-info-bar-text-element-editor"><?php esc_html_e('Text', 'wp-top-info-bar'); ?></label><textarea id="wp-top-info-bar-text-element-editor" rows="6" class="large-text"></textarea></div>
 					<div class="wp-top-info-bar-text-modal__field">
 					<?php $this->image_device_heading(__('Size (px)', 'wp-top-info-bar'), __('Text size for each device. Empty tablet/mobile fields inherit from the larger screen.', 'wp-top-info-bar')); ?>
@@ -416,8 +606,8 @@ final class WP_Top_Info_Bar_Admin {
 					<?php endforeach; ?>
 					</div>
 					<div class="wp-top-info-bar-text-modal__field"><label><?php esc_html_e('Text color', 'wp-top-info-bar'); ?></label><?php $this->color('text_element_editor_color', '#ffffff', '#ffffff'); ?></div>
-				</div>
-				<div class="wp-top-info-bar-image-modal__footer"><button type="button" class="button-link-delete" data-remove-text-element><?php esc_html_e('Remove', 'wp-top-info-bar'); ?></button><button type="button" class="button" data-close-text-modal><?php esc_html_e('Done', 'wp-top-info-bar'); ?></button></div>
+				</div></div>
+				<div class="wp-top-info-bar-image-modal__footer"><button type="button" class="button-link wp-top-info-bar-clone" data-clone-text-element><?php esc_html_e('Clone', 'wp-top-info-bar'); ?></button><button type="button" class="button-link-delete" data-remove-text-element><?php esc_html_e('Remove', 'wp-top-info-bar'); ?></button><button type="button" class="button" data-close-text-modal><?php esc_html_e('Done', 'wp-top-info-bar'); ?></button></div>
 			</div>
 		</div>
 		<?php
@@ -441,7 +631,7 @@ final class WP_Top_Info_Bar_Admin {
 			<div class="wp-top-info-bar-image-modal__panel">
 				<div class="wp-top-info-bar-image-modal__header"><h2 id="wp-top-info-bar-button-modal-title"><?php esc_html_e('Button', 'wp-top-info-bar'); ?></h2><button type="button" class="wp-top-info-bar-image-modal__close" data-close-button-modal aria-label="<?php esc_attr_e('Close', 'wp-top-info-bar'); ?>"><span class="dashicons dashicons-no-alt" aria-hidden="true"></span></button></div>
 				<div class="wp-top-info-bar-image-modal__body"><?php $this->render_button_fields(); ?></div>
-				<div class="wp-top-info-bar-image-modal__footer"><button type="button" class="button-link-delete" data-remove-button-element><?php esc_html_e('Remove', 'wp-top-info-bar'); ?></button><button type="button" class="button" data-close-button-modal><?php esc_html_e('Done', 'wp-top-info-bar'); ?></button></div>
+				<div class="wp-top-info-bar-image-modal__footer"><button type="button" class="button-link wp-top-info-bar-clone" data-clone-button-element><?php esc_html_e('Clone', 'wp-top-info-bar'); ?></button><button type="button" class="button-link-delete" data-remove-button-element><?php esc_html_e('Remove', 'wp-top-info-bar'); ?></button><button type="button" class="button" data-close-button-modal><?php esc_html_e('Done', 'wp-top-info-bar'); ?></button></div>
 			</div>
 		</div>
 		<?php
@@ -451,31 +641,54 @@ final class WP_Top_Info_Bar_Admin {
 		$settings = $this->settings->get_settings();
 		$fields = array(
 			'button_text' => array(__('Text / value', 'wp-top-info-bar'), 'text'),
+			'button_url' => array(__('Link', 'wp-top-info-bar'), 'url'),
 			'button_size' => array(__('Size', 'wp-top-info-bar'), array('extra-small' => __('Extra Small', 'wp-top-info-bar'), 'small' => __('Small', 'wp-top-info-bar'), 'default' => __('Default', 'wp-top-info-bar'), 'large' => __('Large', 'wp-top-info-bar'), 'extra-large' => __('Extra Large', 'wp-top-info-bar'))),
 			'button_shape' => array(__('Corners', 'wp-top-info-bar'), array('square' => __('Square', 'wp-top-info-bar'), 'rounded' => __('Rounded', 'wp-top-info-bar'), 'round' => __('Round', 'wp-top-info-bar'))),
-			'button_style' => array(__('Background', 'wp-top-info-bar'), array('filled' => __('Filled', 'wp-top-info-bar'), 'bordered' => __('Border', 'wp-top-info-bar'))),
+			'button_style' => array(__('Background', 'wp-top-info-bar'), array('filled' => __('Filled', 'wp-top-info-bar'), 'bordered' => __('Border', 'wp-top-info-bar'), 'underline' => __('Underline', 'wp-top-info-bar'))),
 			'button_color' => array(__('Fill / border color', 'wp-top-info-bar'), 'color'),
 			'button_text_color' => array(__('Text color', 'wp-top-info-bar'), 'color'),
-			'button_url' => array(__('Link', 'wp-top-info-bar'), 'url'),
-			'button_new_tab' => array(__('Open in a new window', 'wp-top-info-bar'), 'checkbox'),
-			'button_position' => array(__('Position in the top bar', 'wp-top-info-bar'), array('screen-left' => __('Left edge of screen', 'wp-top-info-bar'), 'text-left' => __('Left of text', 'wp-top-info-bar'), 'text-right' => __('Right of text', 'wp-top-info-bar'), 'screen-right' => __('Right edge of screen', 'wp-top-info-bar'), 'center-top' => __('Top center', 'wp-top-info-bar'), 'center-bottom' => __('Bottom center', 'wp-top-info-bar'))),
 		);
+		$fields = array_replace(array_flip(array('button_text', 'button_url', 'button_style', 'button_shape', 'button_size', 'button_color', 'button_text_color')), $fields);
 		echo '<table class="form-table wp-top-info-bar-button-settings" role="presentation"><tbody>';
 		foreach ($fields as $key => $field) {
 			list($label, $type) = $field;
 			$id = 'wp-top-info-bar-' . str_replace('_', '-', $key);
 			$name = WP_Top_Info_Bar_Settings::OPTION_NAME . '[' . $key . ']';
-			echo '<tr><th><label for="' . esc_attr($id) . '">' . esc_html($label) . '</label></th><td>';
+			if ('button_size' === $key) {
+				echo '<tr data-button-setting="button_size"><th>';
+				$this->image_device_heading($label, '');
+				echo '</th><td>';
+				foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) {
+					echo '<div class="wp-top-info-bar-admin__responsive-device" data-device="' . esc_attr($device) . '"' . ('' === $suffix ? '' : ' hidden') . '><select id="' . esc_attr($id . $suffix) . '" name="' . esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME . '[button_size' . $suffix . ']') . '">';
+					$value = $settings['button_size' . $suffix] ?? '';
+					if ('' !== $suffix) { echo '<option value=""' . selected($value, '', false) . '>' . esc_html__('Inherit', 'wp-top-info-bar') . '</option>'; }
+					foreach ($type as $option => $text) { echo '<option value="' . esc_attr($option) . '"' . selected($value, $option, false) . '>' . esc_html($text) . '</option>'; }
+					echo '</select></div>';
+				}
+				echo '</td></tr>'; continue;
+			}
+			echo '<tr data-button-setting="' . esc_attr($key) . '"><th><label for="' . esc_attr($id) . '">' . esc_html($label) . '</label></th><td>';
 			if (is_array($type)) {
-				echo '<select id="' . esc_attr($id) . '" name="' . esc_attr($name) . '">';
+				echo '<select' . (in_array($key, array('button_shape', 'button_style'), true) ? ' hidden aria-hidden="true" tabindex="-1"' : '') . ' id="' . esc_attr($id) . '" name="' . esc_attr($name) . '">';
 				foreach ($type as $value => $text) { echo '<option value="' . esc_attr($value) . '"' . selected($settings[$key], $value, false) . '>' . esc_html($text) . '</option>'; }
 				echo '</select>';
+				if (in_array($key, array('button_shape', 'button_style'), true)) {
+					echo '<div class="wp-top-info-bar-button-choices" role="group" aria-label="' . esc_attr($label) . '">';
+					foreach ($type as $value => $text) {
+						echo '<button type="button" class="wp-top-info-bar-button-choice" data-button-choice="' . esc_attr($key) . '" data-value="' . esc_attr($value) . '" aria-pressed="' . ($settings[$key] === $value ? 'true' : 'false') . '"><span class="wp-top-info-bar-button-choice__sample wp-top-info-bar-button-choice__sample--' . esc_attr($value) . '">' . esc_html($text) . '</span></button>';
+					}
+					echo '</div>';
+				}
 			} elseif ('color' === $type) {
 				$this->color($key, $settings[$key], 'button_color' === $key ? '#2271b1' : '#ffffff');
 			} elseif ('checkbox' === $type) {
-				echo '<div class="wp-top-info-bar-admin__switch"><input type="hidden" name="' . esc_attr($name) . '" value="0"><label><input type="checkbox" id="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="1"' . checked(! empty($settings[$key]), true, false) . '> ' . esc_html($label) . '</label></div>';
+				echo '<div class="wp-top-info-bar-button-new-tab"><input type="hidden" name="' . esc_attr($name) . '" value="0"><label><input type="checkbox" id="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="1"' . checked(! empty($settings[$key]), true, false) . '> ' . esc_html($label) . '</label></div>';
 			} else {
 				echo '<input class="regular-text" type="' . esc_attr($type) . '" id="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="' . esc_attr($settings[$key]) . '">';
+			}
+			if ('button_url' === $key) {
+				$tab_name = WP_Top_Info_Bar_Settings::OPTION_NAME . '[button_new_tab]';
+				echo '<div class="wp-top-info-bar-button-new-tab"><input type="hidden" name="' . esc_attr($tab_name) . '" value="0"><label><input type="checkbox" id="wp-top-info-bar-button-new-tab" name="' . esc_attr($tab_name) . '" value="1"' . checked(! empty($settings['button_new_tab']), true, false) . '> ' . esc_html__('Open in a new window', 'wp-top-info-bar') . '</label></div>';
 			}
 			echo '</td></tr>';
 		}
@@ -623,10 +836,8 @@ final class WP_Top_Info_Bar_Admin {
 		?>
 		<div class="wp-top-info-bar-images">
 			<input type="hidden" name="<?php echo esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME); ?>[image_position_independent]" value="1">
-			<div class="wp-top-info-bar-gallery" data-images-gallery>
-				<button type="button" class="wp-top-info-bar-gallery__add" data-add-image-row aria-label="<?php esc_attr_e('Add images', 'wp-top-info-bar'); ?>"><span aria-hidden="true">+</span></button>
-			</div>
-			<?php $this->render_single_image_row('shared', $settings['image_defaults'] ?? array(), true); ?>
+			<input type="hidden" name="<?php echo esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME); ?>[images_independent]" value="1">
+			<button type="button" data-add-image-row hidden></button>
 			<div class="wp-top-info-bar-image-modal" data-image-modal role="dialog" aria-modal="true" aria-labelledby="wp-top-info-bar-image-modal-title" hidden>
 				<div class="wp-top-info-bar-image-modal__backdrop" data-close-image-modal></div>
 				<div class="wp-top-info-bar-image-modal__panel">
@@ -634,12 +845,12 @@ final class WP_Top_Info_Bar_Admin {
 					<div class="wp-top-info-bar-image-modal__body" data-images-list>
 						<?php foreach ($images as $index => $image) { $this->render_single_image_row((int) $index, $image); } ?>
 					</div>
-					<div class="wp-top-info-bar-image-modal__footer"><button type="button" class="button" data-reset-image-settings><?php esc_html_e('Reset to general settings', 'wp-top-info-bar'); ?></button><button type="button" class="button" data-close-image-modal><?php esc_html_e('Done', 'wp-top-info-bar'); ?></button></div>
+					<div class="wp-top-info-bar-image-modal__footer"><button type="button" class="button-link wp-top-info-bar-clone" data-clone-active-image><?php esc_html_e('Clone', 'wp-top-info-bar'); ?></button><button type="button" class="button-link-delete" data-remove-active-image><?php esc_html_e('Remove', 'wp-top-info-bar'); ?></button><button type="button" class="button" data-close-image-modal><?php esc_html_e('Done', 'wp-top-info-bar'); ?></button></div>
 				</div>
 			</div>
 		</div>
 		<script type="text/html" id="tmpl-wp-top-info-bar-image-row">
-			<?php $this->render_single_image_row('{{{data.index}}}', array('image_id' => 0, 'override_enabled' => 0, 'override_initialized' => 0)); ?>
+			<?php $this->render_single_image_row('{{{data.index}}}', array('image_id' => 0, 'size' => '40px', 'margin_enabled' => 1, 'animation_enabled' => 1, 'custom_class_enabled' => 1, 'override_enabled' => 1, 'override_initialized' => 1, 'override_fields' => array_fill_keys(array_keys(WP_Top_Info_Bar_Sanitizer::IMAGE_OVERRIDE_GROUPS), 1))); ?>
 		</script>
 		<?php
 	}
@@ -668,6 +879,7 @@ final class WP_Top_Info_Bar_Admin {
 			<input type="hidden" name="<?php echo esc_attr($field_name); ?>[image_id]" value="<?php echo esc_attr((string) $image_id); ?>" data-image-id />
 
 			<?php endif; ?>
+			<div class="wp-top-info-bar-image-general-settings">
 			<div class="wp-top-info-bar-image-row__grid">
 				<?php if (! $shared) : ?>
 				<div class="wp-top-info-bar-image-row__field wp-top-info-bar-image-row__field--preview">
@@ -680,7 +892,7 @@ final class WP_Top_Info_Bar_Admin {
 				</div>
 				<div class="wp-top-info-bar-image-row__actions">
 					<button type="button" class="button wp-top-info-bar-image-row__replace" data-select-image data-replace-image><?php echo esc_html($image_url ? __('Replace image', 'wp-top-info-bar') : __('Choose image', 'wp-top-info-bar')); ?></button>
-					<button type="button" class="button-link-delete" data-remove-image-row><?php esc_html_e('Remove', 'wp-top-info-bar'); ?></button>
+					
 				</div>
 				</div>
 				<input type="hidden" data-image-override name="<?php echo esc_attr($field_name); ?>[override_enabled]" value="<?php echo $override ? '1' : '0'; ?>">
@@ -714,6 +926,12 @@ final class WP_Top_Info_Bar_Admin {
 				</div>
 
 
+				
+
+				</div>
+			</div>
+			</div>
+			<div class="wp-top-info-bar-image-animation-settings" data-image-individual-options>
 				<div class="wp-top-info-bar-image-row__field">
 					<?php echo $this->image_option_toggle($field_name, $image, 'animation', __('Animation', 'wp-top-info-bar'), __('Choose an animation for this image. Swing from top moves the lower part, Swing from bottom moves the upper part, Move left and right shifts the image horizontally, Blink fades the image in and out, and Scale up gently enlarges the image.', 'wp-top-info-bar'), $shared); ?>
 					<div data-image-option-value<?php echo (! $shared || WP_Top_Info_Bar_Sanitizer::image_option_enabled($image, 'animation')) ? '' : ' hidden'; ?>>
@@ -733,13 +951,13 @@ final class WP_Top_Info_Bar_Admin {
 				</div>
 
 
+			</div>
+			<div class="wp-top-info-bar-image-custom-settings" data-image-individual-options>
 				<div class="wp-top-info-bar-image-row__field">
 					<?php echo $this->image_option_toggle($field_name, $image, 'custom_class', __('Custom class', 'wp-top-info-bar'), __('Add one or more CSS classes to target this image, for example: promo-icon highlighted.', 'wp-top-info-bar'), $shared); ?>
 					<div data-image-option-value<?php echo (! $shared || WP_Top_Info_Bar_Sanitizer::image_option_enabled($image, 'custom_class')) ? '' : ' hidden'; ?>>
 					<input type="text" class="regular-text" name="<?php echo esc_attr($field_name); ?>[custom_class]" value="<?php echo esc_attr($custom_class); ?>" />
 					</div>
-				</div>
-
 				</div>
 			</div>
 		</div>
@@ -750,15 +968,15 @@ final class WP_Top_Info_Bar_Admin {
 		return sprintf(
 			'<span class="wp-top-info-bar-label-with-tooltip"><span>%1$s</span>%2$s</span>',
 			esc_html($label),
-			$this->get_tooltip_markup($tooltip, $label)
+			'' !== trim($tooltip) ? $this->get_tooltip_markup($tooltip, $label) : ''
 		);
 	}
 
 	private function image_option_toggle(string $prefix, array $image, string $key, string $label, string $help, bool $shared = true): string {
-		if (! $shared) {
+		if (! $shared && ! in_array($key, array('margin', 'animation'), true)) {
 			return '<input type="hidden" name="' . esc_attr($prefix . '[' . $key . '_enabled]') . '" value="' . (WP_Top_Info_Bar_Sanitizer::image_option_enabled($image, $key) ? '1' : '0') . '">' . $this->get_settings_field_title_markup($label, $help);
 		}
-		return '<div class="wp-top-info-bar-admin__switch"><input type="hidden" name="' . esc_attr($prefix . '[' . $key . '_enabled]') . '" value="0"><label><input type="checkbox" data-image-option="' . esc_attr($key) . '" name="' . esc_attr($prefix . '[' . $key . '_enabled]') . '" value="1"' . checked(WP_Top_Info_Bar_Sanitizer::image_option_enabled($image, $key), true, false) . '> ' . esc_html($label) . '</label>' . $this->get_tooltip_markup($help, $label) . '</div>';
+		return '<div class="wp-top-info-bar-admin__switch"><input type="hidden" name="' . esc_attr($prefix . '[' . $key . '_enabled]') . '" value="0"><label><input type="checkbox" data-image-option="' . esc_attr($key) . '" name="' . esc_attr($prefix . '[' . $key . '_enabled]') . '" value="1"' . checked(WP_Top_Info_Bar_Sanitizer::image_option_enabled($image, $key), true, false) . '> ' . esc_html($label) . '</label>' . '</div>';
 	}
 
 	private function image_device_heading(string $label, string $help, string $toggle = ''): void {

@@ -1,4 +1,4 @@
-ï»¿(function ($) {
+﻿(function ($) {
  'use strict';
  $(function () {
   const $modal = $('[data-text-modal]'), $storage = $('[data-text-elements]');
@@ -81,6 +81,17 @@
   });
   $color.on('input change', function () { if (!loading) { field('text_color',this.value); notify(); } });
   $modal.find('[data-close-text-modal]').on('click',close);
+  $modal.find('[data-clone-text-element]').on('click',function () {
+   if (active === null) return;
+   persist();
+   const source = active, id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+   const $copy = row(source).clone(false,false).attr('data-text-element',id);
+   $copy.find('[name]').each(function () { this.name = this.name.replace(/\[texts\]\[[^\]]+\]/, '[texts][' + id + ']'); });
+   $copy.insertAfter(row(source));
+   window.wpTopInfoBarLayout.cloneAfter('text:' + source, 'text:' + id);
+   notify(); close();
+   setTimeout(function () { $('[data-layout-key="text:' + id + '"]').trigger('focus'); },0);
+  });
   $modal.find('[data-remove-text-element]').on('click',function () {
    const id = active; row(id).remove(); active = null;
    let keys = []; try { keys = JSON.parse($('[data-layout-order]').val() || '[]'); } catch(e) {}

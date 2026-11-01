@@ -16,18 +16,9 @@ final class WP_Top_Info_Bar_Frontend {
 	}
 
 	public function enqueue_frontend_assets(): void {
-		$settings = $this->settings->get_settings();
-		$images = is_array($settings['images']) ? $settings['images'] : array();
-		$has_buttons = false;
-		foreach ((new WP_Top_Info_Bar_Sanitizer())->sanitize_button_elements($settings) as $element) { if ('' !== $element['button_text']) { $has_buttons = true; } }
-		$has_message = false;
-		foreach ((new WP_Top_Info_Bar_Sanitizer())->sanitize_text_elements($settings) as $element) { if ('' !== $element['message']) { $has_message = true; } }
-
 		global $post;
 		$has_shortcode = $post && has_shortcode($post->post_content, 'wp_top_info_bar');
-		if (! $has_shortcode && (empty($settings['enabled']) || (! $has_message && empty($images) && ! $has_buttons))) {
-			return;
-		}
+		if (! $has_shortcode && ! $this->automatic_settings()) { return; }
 
 		wp_enqueue_style(
 			'wp-top-info-bar-frontend',
@@ -39,8 +30,35 @@ final class WP_Top_Info_Bar_Frontend {
 	}
 
 	public function render_info_bar(): void {
-		$settings = $this->settings->get_settings();
-		$this->render_settings($settings);
+		foreach ($this->automatic_settings() as $settings) { $this->render_settings($settings); }
+	}
+
+	/** Every published, enabled bar, with deterministic ties by ID. */
+	private function automatic_settings(): array {
+		$posts = get_posts(array('post_type' => WP_Top_Info_Bar_Settings::POST_TYPE, 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'ID', 'order' => 'ASC'));
+		usort($posts, static function ($a, $b) { return max(1, (int) $a->menu_order) <=> max(1, (int) $b->menu_order) ?: $a->ID <=> $b->ID; });
+		$bars = array();
+		foreach ($posts as $post) {
+			if ('' !== $post->post_password) { continue; }
+			$settings = (new WP_Top_Info_Bar_Settings((int) $post->ID))->get_settings();
+			if (empty($settings['enabled']) || ! $this->has_content($settings)) { continue; }
+			if ('' === $settings['custom_id']) { $settings['custom_id'] = 'wp-top-info-bar-' . $post->ID; }
+			$bars[] = $settings;
+		}
+		// Keep an unmigrated legacy installation working until its first admin visit.
+		if (! $posts && ! get_option(WP_Top_Info_Bar_Settings::GLOBAL_POST_OPTION, 0)) {
+			$settings = $this->settings->get_settings();
+			if (! empty($settings['enabled']) && $this->has_content($settings)) { $bars[] = $settings; }
+		}
+		return $bars;
+	}
+
+	private function has_content(array $settings): bool {
+		if (! empty($settings['images'])) { return true; }
+		$sanitizer = new WP_Top_Info_Bar_Sanitizer();
+		foreach ($sanitizer->sanitize_text_elements($settings) as $element) { if ('' !== $element['message']) { return true; } }
+		foreach ($sanitizer->sanitize_button_elements($settings) as $element) { if ('' !== $element['button_text']) { return true; } }
+		return false;
 	}
 
 	public function shortcode($atts): string {
@@ -63,20 +81,8 @@ final class WP_Top_Info_Bar_Frontend {
 
 	/** Shared rendering for the site and the unsaved settings preview. */
 	public function render_settings(array $settings): void {
-		$images = is_array($settings['images']) ? $settings['images'] : array();
-		$defaults = (new WP_Top_Info_Bar_Sanitizer())->sanitize_image_defaults($settings['image_defaults'] ?? array());
-		foreach ($images as $index => &$image) {
-			if (is_array($image)) {
-				$mask = (new WP_Top_Info_Bar_Sanitizer())->image_overrides($image, $defaults);
-				$resolved = $defaults;
-				foreach (WP_Top_Info_Bar_Sanitizer::IMAGE_OVERRIDE_GROUPS as $group => $fields) {
-					if (! empty($mask[$group])) foreach ($fields as $key) { if (array_key_exists($key, $image)) $resolved[$key] = $image[$key]; }
-				}
-				foreach (array('position', 'position_tablet', 'position_mobile') as $key) { $resolved[$key] = $image[$key] ?? ('position' === $key ? 'left' : ''); }
-				$image = array_merge($resolved, array('image_id' => $image['image_id'] ?? 0));
-				$image['_order'] = $index;
-			}
-		}
+		$images = (new WP_Top_Info_Bar_Sanitizer())->independent_images($settings);
+		foreach ($images as $index => &$image) { $image['_order'] = $index; }
 		unset($image);
 		$has_buttons = false;
 		foreach ((new WP_Top_Info_Bar_Sanitizer())->sanitize_button_elements($settings) as $element) { if ('' !== $element['button_text']) { $has_buttons = true; } }
@@ -106,6 +112,12 @@ final class WP_Top_Info_Bar_Frontend {
 		if (! empty($settings['layout_order']) || ! empty($settings['zone_settings'])) { $content_classes .= ' wp-top-info-bar__content--ordered'; }
 		$text_classes = 'wp-top-info-bar__inner' . $this->build_text_animation_class_suffix($animation);
 		$text_style_attribute = $this->build_text_style_attribute($settings);
+		$zone_widths = (new WP_Top_Info_Bar_Sanitizer())->sanitize_zone_settings($settings['zone_settings'] ?? array());
+		foreach ($zone_widths as $zone => $values) {
+			foreach (array('', '_tablet', '_mobile') as $suffix) {
+				if ('' !== ($values['width' . $suffix] ?? '')) { $text_style_attribute .= ';--top-zone-' . $zone . '-width' . str_replace('_', '-', $suffix) . ':' . ('auto' === $values['width' . $suffix] ? 'max-content' : $values['width' . $suffix]); }
+			}
+		}
 		$text_style_attribute .= ';--wp-top-info-bar-marquee-speed:' . max(1, min(1000, (float) ($settings['marquee_speed'] ?? 60)));
 
 		echo '<div ' . implode(' ', $attributes) . '>';
@@ -133,7 +145,7 @@ final class WP_Top_Info_Bar_Frontend {
 					if (! isset($buckets[$zone])) { $zone = 'center'; }
 					$buckets[$zone] .= $elements[$key];
 				}
-				foreach ($buckets as $zone => $html) { echo '<div class="wp-top-info-bar__layout-zone wp-top-info-bar__layout-zone--' . esc_attr($zone) . '" style="' . esc_attr($this->zone_style($settings, $zone)) . '">' . $html . '</div>'; }
+				foreach ($buckets as $zone => $html) { echo '<div class="wp-top-info-bar__layout-zone wp-top-info-bar__layout-zone--' . esc_attr($zone) . '" style="' . esc_attr($this->zone_style($settings, $zone)) . '" data-zone-animation="' . esc_attr(wp_json_encode($zone_widths[$zone] ?? array())) . '"><div class="wp-top-info-bar__zone-track">' . $html . '</div></div>'; }
 				echo '</div></div>'; return;
 			}
 			foreach ($settings['layout_order'] as $key) {
@@ -183,6 +195,7 @@ final class WP_Top_Info_Bar_Frontend {
 		$values = $zones[$zone] ?? array();
 		$style = 'background-color:' . ($values['background_color'] ?? 'transparent');
 		foreach (array('padding', 'margin') as $key) {
+			if (isset($values[$key . '_enabled']) && empty($values[$key . '_enabled'])) { continue; }
 			foreach (array('', '_tablet', '_mobile') as $suffix) {
 				if ('' !== ($values[$key . $suffix] ?? '')) { $style .= ';--top-zone-' . $key . str_replace('_', '-', $suffix) . ':' . $values[$key . $suffix]; }
 			}
@@ -207,6 +220,12 @@ final class WP_Top_Info_Bar_Frontend {
 		if ('' === trim((string) ($settings['button_text'] ?? '')) || ($settings['button_position'] ?? 'text-right') !== $position) { return; }
 		$class = 'wp-top-info-bar__button wp-top-info-bar__button--' . ($settings['button_size'] ?? 'default') . ' wp-top-info-bar__button--' . ($settings['button_shape'] ?? 'square') . ' wp-top-info-bar__button--' . ($settings['button_style'] ?? 'filled') . ' wp-top-info-bar__button--' . $position;
 		$style = '--top-button-color:' . ($settings['button_color'] ?? '#2271b1') . ';--top-button-text:' . ($settings['button_text_color'] ?? '#ffffff');
+		$presets = array('extra-small' => array('5px 10px', '28px', '11px'), 'small' => array('5px 14px', '36px', '12px'), 'default' => array('5px 20px', '42px', '13px'), 'large' => array('5px 28px', '48px', '14px'), 'extra-large' => array('5px 40px', '56px', '16px'));
+		$size = 'default';
+		foreach (array('' => '', '_tablet' => '-tablet', '_mobile' => '-mobile') as $suffix => $css_suffix) {
+			if (! empty($settings['button_size' . $suffix]) && isset($presets[$settings['button_size' . $suffix]])) { $size = $settings['button_size' . $suffix]; }
+			foreach (array('padding', 'height', 'font-size') as $index => $property) { $style .= ';--top-button-' . $property . $css_suffix . ':' . $presets[$size][$index]; }
+		}
 		$url = $settings['button_url'] ?? '';
 		$tag = '' !== $url ? 'a' : 'span';
 		$attributes = '' !== $url ? ' href="' . esc_url($url, array('http', 'https', 'mailto', 'tel')) . '"' : '';
@@ -219,6 +238,7 @@ final class WP_Top_Info_Bar_Frontend {
 	}
 
 	private function build_style_attribute(array $settings): string {
+		$settings = wp_parse_args($settings, (new WP_Top_Info_Bar_Settings())->get_defaults());
 		foreach (array('padding', 'margin') as $key) {
 			if (isset($settings[$key . '_enabled']) && empty($settings[$key . '_enabled'])) {
 				foreach (array('', '_tablet', '_mobile') as $suffix) { $settings[$key . $suffix] = '0px'; }
@@ -259,6 +279,15 @@ final class WP_Top_Info_Bar_Frontend {
 			$styles[] = '--wp-top-info-bar-margin-mobile:' . $settings['margin_mobile'];
 		}
 
+		$border_width = empty($settings['border_enabled']) ? 0 : $settings['border_width'];
+		$styles[] = '--top-bar-border-width:' . (float) $border_width . 'px';
+		$styles[] = '--top-bar-border-color:' . $settings['border_color'];
+		foreach (array('_tablet', '_mobile') as $suffix) {
+			if (! empty($settings['border_enabled']) && '' !== $settings['border_width' . $suffix]) { $styles[] = '--top-bar-border-width' . str_replace('_', '-', $suffix) . ':' . (float) $settings['border_width' . $suffix] . 'px'; }
+		}
+		$shadow = 'none';
+		if (! empty($settings['shadow_enabled'])) { $shadow = (float) $settings['shadow_x'] . 'px ' . (float) $settings['shadow_y'] . 'px ' . (float) $settings['shadow_blur'] . 'px ' . (float) $settings['shadow_spread'] . 'px ' . $settings['shadow_color']; }
+		$styles[] = '--top-bar-shadow:' . $shadow;
 		return implode(';', $styles) . ';';
 	}
 

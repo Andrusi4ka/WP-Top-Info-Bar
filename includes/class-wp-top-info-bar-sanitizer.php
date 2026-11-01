@@ -43,10 +43,22 @@ final class WP_Top_Info_Bar_Sanitizer {
 			'margin_mobile'    => $this->sanitize_spacing_value($this->text($input, 'margin_mobile', '')),
 			'custom_class'     => $this->sanitize_class_list($this->text($input, 'custom_class', '')),
 			'custom_id'        => $this->sanitize_html_identifier($this->text($input, 'custom_id', '')),
-			'images'           => $this->sanitize_images($input['images'] ?? array()),
+			'images'           => $this->independent_images($input),
+			'images_independent' => 1,
 			'image_defaults'   => $this->sanitize_image_defaults($input['image_defaults'] ?? array()),
 			'image_position_independent' => 1,
 		);
+		$out['border_enabled'] = ! empty($input['border_enabled']) && is_scalar($input['border_enabled']) ? 1 : 0;
+		$out['shadow_enabled'] = ! empty($input['shadow_enabled']) && is_scalar($input['shadow_enabled']) ? 1 : 0;
+		$out['border_color'] = $this->sanitize_hex_color($this->text($input, 'border_color', '#ffffff'), '#ffffff');
+		$out['shadow_color'] = $this->sanitize_hex_color($this->text($input, 'shadow_color', 'rgba(0,0,0,0.3)'), 'rgba(0,0,0,0.3)');
+		foreach (array('', '_tablet', '_mobile') as $suffix) {
+			$value = $this->text($input, 'border_width' . $suffix, '' === $suffix ? '2' : '');
+			$out['border_width' . $suffix] = '' !== $suffix && '' === $value ? '' : max(0, min(50, (float) $value));
+		}
+		foreach (array('shadow_x' => array(0, -100, 100), 'shadow_y' => array(8, -100, 100), 'shadow_blur' => array(20, 0, 100), 'shadow_spread' => array(0, -50, 50)) as $key => $limits) {
+			$out[$key] = max($limits[1], min($limits[2], (float) $this->text($input, $key, (string) $limits[0])));
+		}
 		// Image rows can have sparse form indexes; saving compacts them.
 		$layout = $input['layout_order'] ?? array();
 		if (is_string($layout)) { $layout = json_decode($layout, true); }
@@ -77,7 +89,7 @@ final class WP_Top_Info_Bar_Sanitizer {
 			$value = $this->text($input, 'marquee_speed' . $suffix, '');
 			$out['marquee_speed' . $suffix] = '' === $value ? '' : max(1, min(1000, (float) $value));
 		}
-		if (empty($input['image_position_independent'])) {
+		if (empty($input['images_independent']) && empty($input['image_position_independent'])) {
 			foreach ($out['images'] as &$image) {
 				if (empty($image['override_enabled'])) {
 					foreach (array('position', 'position_tablet', 'position_mobile') as $key) { $image[$key] = $out['image_defaults'][$key]; }
@@ -86,7 +98,7 @@ final class WP_Top_Info_Bar_Sanitizer {
 			unset($image);
 		}
 		foreach ($out['images'] as &$image) {
-			$image['override_fields'] = $this->image_overrides($image, $out['image_defaults']);
+			$image['override_fields'] = array_fill_keys(array_keys(self::IMAGE_OVERRIDE_GROUPS), 1);
 			$image['override_enabled'] = in_array(1, $image['override_fields'], true) ? 1 : 0;
 		}
 		unset($image);
@@ -152,14 +164,61 @@ final class WP_Top_Info_Bar_Sanitizer {
 	}
 
 	/** The formatting offered by the WordPress text editor, without embeds or scripts. */
+	/** Materialize legacy shared settings once; every image then owns its values. */
+	public function independent_images(array $settings): array {
+		$defaults = $this->sanitize_image_defaults($settings['image_defaults'] ?? array());
+		$images = array();
+		foreach (is_array($settings['images'] ?? null) ? $settings['images'] : array() as $image) {
+			if (! is_array($image)) { continue; }
+			if (empty($settings['images_independent'])) {
+				$mask = $this->image_overrides($image, $defaults);
+				$resolved = $defaults;
+				foreach (self::IMAGE_OVERRIDE_GROUPS as $group => $fields) {
+					if (! empty($mask[$group])) { foreach ($fields as $key) { if (array_key_exists($key, $image)) { $resolved[$key] = $image[$key]; } } }
+				}
+				foreach (array('image_id', 'position', 'position_tablet', 'position_mobile') as $key) { $resolved[$key] = $image[$key] ?? ('position' === $key ? 'left' : ''); }
+				$image = $resolved;
+			}
+			if (empty($settings['images_independent'])) {
+			if (! self::image_option_enabled($image, 'margin')) { $image['margin'] = '0'; $image['margin_tablet'] = ''; $image['margin_mobile'] = ''; unset($image['margin_sides']); }
+			if (! self::image_option_enabled($image, 'animation')) { $image['animation'] = 'none'; }
+			if (! self::image_option_enabled($image, 'custom_class')) { $image['custom_class'] = ''; }
+			foreach (array('margin', 'animation', 'custom_class') as $key) { $image[$key . '_enabled'] = 1; }
+			}
+			$image['override_enabled'] = 1; $image['override_initialized'] = 1;
+			$image['override_fields'] = array_fill_keys(array_keys(self::IMAGE_OVERRIDE_GROUPS), 1);
+			$images[] = $image;
+		}
+		return $this->sanitize_images($images);
+	}
+
 	public function sanitize_zone_settings($input): array {
 		$out = array();
 		foreach (array('left', 'center', 'right') as $zone) {
 			if (! is_array($input) || ! isset($input[$zone]) || ! is_array($input[$zone])) { continue; }
 			$values = $input[$zone];
 			$clean = array('background_color' => $this->sanitize_hex_color($this->text($values, 'background_color', 'rgba(0,0,0,0)'), 'rgba(0,0,0,0)'));
+			foreach (array('', '_tablet', '_mobile') as $suffix) {
+				$value = strtolower(trim($this->text($values, 'width' . $suffix)));
+				if ('' === $suffix && '' === $value && 'center' !== $zone) { $value = 'auto'; }
+				if (preg_match('/^(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:px|%)?$/', $value)) {
+					$number = (float) $value;
+					$value = (string) (false !== strpos($value, '%') ? min(100, $number) : $number) . (false !== strpos($value, '%') ? '%' : 'px');
+				} elseif ('auto' !== $value) { $value = ''; }
+				$clean['width' . $suffix] = $value;
+			}
 			foreach (array('padding', 'margin') as $key) {
+				$clean[$key . '_enabled'] = array_key_exists($key . '_enabled', $values) ? (empty($values[$key . '_enabled']) ? 0 : 1) : 1;
 				foreach (array('', '_tablet', '_mobile') as $suffix) { $clean[$key . $suffix] = $this->sanitize_spacing_value($this->text($values, $key . $suffix)); }
+			}
+			foreach (array('', '_tablet', '_mobile') as $suffix) {
+				$mode = $this->text($values, 'animation_mode' . $suffix, '' === $suffix ? 'inherit' : '');
+				$clean['animation_mode' . $suffix] = in_array($mode, array('inherit', 'none', 'custom'), true) ? $mode : ('' === $suffix ? 'inherit' : '');
+				$value = $this->text($values, 'animation' . $suffix, '' === $suffix ? 'fade-in' : '');
+				$clean['animation' . $suffix] = '' !== $suffix && '' === $value ? '' : $this->sanitize_animation($value);
+				$clean['animation_delay' . $suffix] = $this->sanitize_animation_delay($this->text($values, 'animation_delay' . $suffix));
+				$value = $this->text($values, 'animation_speed' . $suffix, '' === $suffix ? '60' : '');
+				$clean['animation_speed' . $suffix] = '' === $value ? '' : max(1, min(1000, (float) $value));
 			}
 			$out[$zone] = $this->apply_spacing_sides($values, $clean, array('padding', 'margin'));
 		}
@@ -188,11 +247,15 @@ final class WP_Top_Info_Bar_Sanitizer {
 		foreach (array(
 			'button_size' => array('default', 'extra-small', 'small', 'large', 'extra-large'),
 			'button_shape' => array('square', 'rounded', 'round'),
-			'button_style' => array('filled', 'bordered'),
+			'button_style' => array('filled', 'bordered', 'underline'),
 			'button_position' => array('text-right', 'screen-left', 'text-left', 'screen-right', 'center-top', 'center-bottom'),
 		) as $key => $allowed) {
 			$value = $this->text($input, $key, $allowed[0]);
 			$out[$key] = in_array($value, $allowed, true) ? $value : $allowed[0];
+		}
+		foreach (array('_tablet', '_mobile') as $suffix) {
+			$value = $this->text($input, 'button_size' . $suffix);
+			$out['button_size' . $suffix] = in_array($value, array('extra-small', 'small', 'default', 'large', 'extra-large'), true) ? $value : '';
 		}
 		return $out;
 	}

@@ -35,7 +35,7 @@
 	}
 
 	function measurements() {
-		return Array.from(document.querySelectorAll('.wp-top-info-bar, .wp-top-info-bar__inner, .wp-top-info-bar__image')).filter(el => {
+		return Array.from(document.querySelectorAll('.wp-top-info-bar, .wp-top-info-bar__inner, .wp-top-info-bar__layout-zone, .wp-top-info-bar__image')).filter(el => {
 			return el.getClientRects().length && getComputedStyle(el).display !== 'none';
 		}).map((el, index) => {
 			const bounds = el.getBoundingClientRect();
@@ -43,7 +43,8 @@
 			const padding = sides.map(side => number(css.getPropertyValue('padding-' + side)));
 			const margin = sides.map(side => number(css.getPropertyValue('margin-' + side)));
 			const border = sides.map(side => number(css.getPropertyValue('border-' + side + '-width')));
-			const target = el.classList.contains('wp-top-info-bar') ? 'bar' : el.classList.contains('wp-top-info-bar__inner') ? 'text' : 'image-' + index;
+			const zone = ['left', 'center', 'right'].find(name => el.classList.contains('wp-top-info-bar__layout-zone--' + name));
+			const target = zone ? 'zone-' + zone : el.classList.contains('wp-top-info-bar') ? 'bar' : el.classList.contains('wp-top-info-bar__inner') ? 'text' : 'image-' + index;
 			return {bounds, padding, margin, border, target};
 		});
 	}
