@@ -33,7 +33,7 @@ final class WP_Top_Info_Bar_Settings {
 			'shadow_enabled' => 0, 'shadow_x' => 0, 'shadow_y' => 8, 'shadow_blur' => 20, 'shadow_spread' => 0, 'shadow_color' => 'rgba(0,0,0,0.3)',
 			'text_color'       => '#ffffff',
 			'animation'        => 'none',
-			'animation_enabled' => 1,
+			'animation_enabled' => 0,
 			'text_delay'       => '',
 			'marquee_speed'    => 60,
 			'animation_tablet' => '', 'animation_mobile' => '',
@@ -42,8 +42,8 @@ final class WP_Top_Info_Bar_Settings {
 			'font_size'        => '14px',
 			'font_size_tablet' => '',
 			'font_size_mobile' => '',
-			'padding_enabled' => 1,
-			'margin_enabled' => 1,
+			'padding_enabled' => 0,
+			'margin_enabled' => 0,
 			'padding'          => '12px 16px',
 			'padding_tablet'   => '',
 			'padding_mobile'   => '',
@@ -62,6 +62,12 @@ final class WP_Top_Info_Bar_Settings {
 		$settings = $post_id ? get_post_meta($post_id, self::META_KEY, true) : get_option(self::OPTION_NAME, array());
 
 		if (! is_array($settings)) { $settings = array(); }
+		// Preserve spacing for saved bars created before the switches existed.
+		if (! empty($settings)) {
+			foreach (array('padding', 'margin') as $key) {
+				if (! array_key_exists($key . '_enabled', $settings)) { $settings[$key . '_enabled'] = 1; }
+			}
+		}
 		// First opening of the gallery: use the first legacy image as the
 		// common style; retain different existing images as individual styles.
 		if (! array_key_exists('image_defaults', $settings)) {

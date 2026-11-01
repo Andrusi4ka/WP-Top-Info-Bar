@@ -850,7 +850,7 @@ final class WP_Top_Info_Bar_Admin {
 			</div>
 		</div>
 		<script type="text/html" id="tmpl-wp-top-info-bar-image-row">
-			<?php $this->render_single_image_row('{{{data.index}}}', array('image_id' => 0, 'size' => '40px', 'margin_enabled' => 1, 'animation_enabled' => 1, 'custom_class_enabled' => 1, 'override_enabled' => 1, 'override_initialized' => 1, 'override_fields' => array_fill_keys(array_keys(WP_Top_Info_Bar_Sanitizer::IMAGE_OVERRIDE_GROUPS), 1))); ?>
+			<?php $this->render_single_image_row('{{{data.index}}}', array('image_id' => 0, 'size' => '40px', 'margin_enabled' => 0, 'animation_enabled' => 0, 'custom_class_enabled' => 1, 'override_enabled' => 1, 'override_initialized' => 1, 'override_fields' => array_fill_keys(array_keys(WP_Top_Info_Bar_Sanitizer::IMAGE_OVERRIDE_GROUPS), 1))); ?>
 		</script>
 		<?php
 	}
