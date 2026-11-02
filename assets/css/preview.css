@@ -800,3 +800,56 @@ body.wp-top-info-bar-modal-open{overflow:hidden}
 }
 .wp-top-info-bar-image-animation-settings { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin-top:8px; }
 .wp-top-info-bar-image-custom-settings { margin-top:8px; }
+
+/* Fill the editor width while keeping the device stage as wide as its former column. */
+.wp-top-info-bar-admin.wp-top-info-bar-workspace > .wp-top-info-bar-admin__settings {
+	display: contents;
+}
+
+.wp-top-info-bar-workspace > .wp-top-info-bar-admin__preview {
+	grid-column: 1 / -1;
+	min-width: 0;
+}
+
+.wp-top-info-bar-workspace .wp-top-info-bar-preview__stage {
+	/* Former 3/5 column: subtract its 16px grid gap and the panel's 34px padding/border. */
+	width: calc(60% - 23.2px);
+	max-width: 100%;
+	margin-inline: auto;
+}
+
+@container (max-width: 1000px) {
+	.wp-top-info-bar-workspace .wp-top-info-bar-preview__stage {
+		width: 100%;
+	}
+}
+/* Animation guidance uses the space left of the centered device. */
+.wp-top-info-bar-preview__content {
+	display: grid;
+	grid-template-columns: calc(20% + 11.6px) minmax(0, 1fr) calc(20% + 11.6px);
+	align-items: start;
+}
+
+.wp-top-info-bar-preview__animation-note {
+	margin: 0 16px 0 0;
+	color: #646970;
+	font-size: 13px;
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+
+.wp-top-info-bar-workspace .wp-top-info-bar-preview__content > .wp-top-info-bar-preview__stage {
+	width: 100%;
+	min-width: 0;
+}
+
+@container (max-width: 1000px) {
+	.wp-top-info-bar-preview__content {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 16px;
+	}
+
+	.wp-top-info-bar-preview__animation-note {
+		margin: 0;
+	}
+}

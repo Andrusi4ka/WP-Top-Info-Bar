@@ -51,7 +51,7 @@ final class WP_Top_Info_Bar_Admin {
 				'add_new_item' => __('Add Top Bar', 'wp-top-info-bar'),
 			),
 			'public' => false, 'show_ui' => true, 'show_in_menu' => true,
-			'menu_icon' => 'dashicons-megaphone', 'menu_position' => 81,
+			'menu_icon' => 'dashicons-megaphone', 'menu_position' => 26,
 			'show_in_rest' => false, 'supports' => array('title'),
 			'capabilities' => array(
 				'edit_post' => 'manage_options', 'read_post' => 'manage_options', 'delete_post' => 'manage_options',
@@ -348,15 +348,16 @@ final class WP_Top_Info_Bar_Admin {
 		$this->settings = new WP_Top_Info_Bar_Settings((int) $post->ID);
 		?>
 		<div class="wp-top-info-bar-admin wp-top-info-bar-layout-field">
+		<button type="button" class="wp-top-info-bar-layout-icon dashicons dashicons-admin-generic" data-bar-settings-open aria-haspopup="dialog" aria-expanded="false" aria-controls="wp-top-info-bar-settings-modal" aria-label="<?php esc_attr_e('Bar settings', 'wp-top-info-bar'); ?>"></button>
 		<div class="wp-top-info-bar-layout-builder" data-layout-builder>
 						<input type="hidden" data-layout-order name="<?php echo esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME); ?>[layout_order]" value="<?php echo esc_attr(wp_json_encode($this->settings->get_settings()['layout_order'])); ?>">
 							<input type="hidden" data-layout-zones name="<?php echo esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME); ?>[layout_zones]" value="<?php echo esc_attr(wp_json_encode($this->settings->get_settings()['layout_zones'])); ?>">
 <div class="wp-top-info-bar-layout-builder__frame">
-			<div class="wp-top-info-bar-layout-builder__bar wp-top-info-bar-layout-builder__side" data-layout-zone="left"><button type="button" class="wp-top-info-bar-layout-builder__add" data-layout-add aria-haspopup="dialog" aria-expanded="false" aria-controls="wp-top-info-bar-element-picker" aria-label="<?php esc_attr_e('Add element on the left', 'wp-top-info-bar'); ?>"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span></button></div>
-			<div class="wp-top-info-bar-layout-builder__bar" data-layout-zone="center">
+			<div class="wp-top-info-bar-layout-builder__bar wp-top-info-bar-layout-builder__side" data-layout-zone="left"><button type="button" class="wp-top-info-bar-zone-icon dashicons dashicons-admin-generic" data-zone-edit aria-haspopup="dialog" aria-expanded="false" aria-controls="wp-top-info-bar-zone-modal" aria-label="<?php esc_attr_e('Edit zone', 'wp-top-info-bar'); ?>"></button><button type="button" class="wp-top-info-bar-layout-builder__add" data-layout-add aria-haspopup="dialog" aria-expanded="false" aria-controls="wp-top-info-bar-element-picker" aria-label="<?php esc_attr_e('Add element on the left', 'wp-top-info-bar'); ?>"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span></button></div>
+			<div class="wp-top-info-bar-layout-builder__bar" data-layout-zone="center"><button type="button" class="wp-top-info-bar-zone-icon dashicons dashicons-admin-generic" data-zone-edit aria-haspopup="dialog" aria-expanded="false" aria-controls="wp-top-info-bar-zone-modal" aria-label="<?php esc_attr_e('Edit zone', 'wp-top-info-bar'); ?>"></button>
 								<button type="button" class="wp-top-info-bar-layout-builder__add" data-layout-add aria-haspopup="dialog" aria-label="<?php esc_attr_e('Add element', 'wp-top-info-bar'); ?>" title="<?php esc_attr_e('Add element', 'wp-top-info-bar'); ?>" aria-expanded="false" aria-controls="wp-top-info-bar-element-picker"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span></button>
 							</div>
-			<div class="wp-top-info-bar-layout-builder__bar wp-top-info-bar-layout-builder__side" data-layout-zone="right"><button type="button" class="wp-top-info-bar-layout-builder__add" data-layout-add aria-haspopup="dialog" aria-expanded="false" aria-controls="wp-top-info-bar-element-picker" aria-label="<?php esc_attr_e('Add element on the right', 'wp-top-info-bar'); ?>"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span></button></div>
+			<div class="wp-top-info-bar-layout-builder__bar wp-top-info-bar-layout-builder__side" data-layout-zone="right"><button type="button" class="wp-top-info-bar-zone-icon dashicons dashicons-admin-generic" data-zone-edit aria-haspopup="dialog" aria-expanded="false" aria-controls="wp-top-info-bar-zone-modal" aria-label="<?php esc_attr_e('Edit zone', 'wp-top-info-bar'); ?>"></button><button type="button" class="wp-top-info-bar-layout-builder__add" data-layout-add aria-haspopup="dialog" aria-expanded="false" aria-controls="wp-top-info-bar-element-picker" aria-label="<?php esc_attr_e('Add element on the right', 'wp-top-info-bar'); ?>"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span></button></div>
 			</div>
 							<div class="wp-top-info-bar-image-modal wp-top-info-bar-element-modal" id="wp-top-info-bar-element-picker" data-layout-picker role="dialog" aria-modal="true" aria-labelledby="wp-top-info-bar-element-picker-title" hidden>
 								<div class="wp-top-info-bar-image-modal__backdrop" data-close-layout-picker></div>
@@ -379,6 +380,8 @@ final class WP_Top_Info_Bar_Admin {
 
 	public function render_settings_box($post): void {
 		$this->settings = new WP_Top_Info_Bar_Settings((int) $post->ID);
+		// Field titles contain spacing switches: rebuild them for this bar, not the global one.
+		$this->register_settings();
 		wp_nonce_field(self::SAVE_NONCE, self::SAVE_NONCE . '_nonce');
 		?>
 		<div class="wp-top-info-bar-settings">
@@ -386,14 +389,21 @@ final class WP_Top_Info_Bar_Admin {
 				<div class="wp-top-info-bar-admin wp-top-info-bar-workspace">
 				
 				<div class="wp-top-info-bar-admin__settings">
-				<div class="wp-top-info-bar-admin__switch wp-top-info-bar-admin__enable"><?php $this->render_enabled_field(); ?></div>
+				<div class="wp-top-info-bar-image-modal wp-top-info-bar-bar-settings-modal" id="wp-top-info-bar-settings-modal" role="dialog" aria-modal="true" aria-labelledby="wp-top-info-bar-settings-modal-title" hidden>
+					<div class="wp-top-info-bar-image-modal__backdrop" data-bar-settings-close></div>
+					<div class="wp-top-info-bar-image-modal__panel">
+						<div class="wp-top-info-bar-image-modal__header">
+							<h2 id="wp-top-info-bar-settings-modal-title"><?php esc_html_e('Bar settings', 'wp-top-info-bar'); ?></h2>
+							<button type="button" class="wp-top-info-bar-image-modal__close" data-bar-settings-close aria-label="<?php esc_attr_e('Close', 'wp-top-info-bar'); ?>"><span class="dashicons dashicons-no-alt" aria-hidden="true"></span></button>
+						</div>
+						<div class="wp-top-info-bar-image-modal__body">
+
 				<?php foreach (self::pages() as $page => $meta) : ?>
 					<fieldset class="wp-top-info-bar-admin__page" id="wp-top-info-bar-page-<?php echo esc_attr($page); ?>" data-page="<?php echo esc_attr($page); ?>"<?php echo 'generell' === $page ? '' : ' hidden'; ?>>
 						<legend><?php echo esc_html($meta[0]); ?></legend>
 						<?php if ('generell' === $page) : ?>
 						
-						<section class="wp-top-info-bar-admin__general-block wp-top-info-bar-admin__appearance" aria-labelledby="wp-top-info-bar-appearance-heading">
-						<h3 id="wp-top-info-bar-appearance-heading"><?php esc_html_e('Appearance', 'wp-top-info-bar'); ?></h3>
+						<section class="wp-top-info-bar-admin__general-block wp-top-info-bar-admin__appearance">
 						<div class="wp-top-info-bar-admin__background-block"><table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_background'); ?></tbody></table></div>
 						<div class="wp-top-info-bar-admin__spacing-block"><table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_spacing'); ?></tbody></table></div>
 						<?php $this->render_bar_decoration_fields(); ?>
@@ -407,8 +417,7 @@ final class WP_Top_Info_Bar_Admin {
 								<table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_animation'); ?></tbody></table>
 							</div>
 						</div>
-						<section class="wp-top-info-bar-admin__general-block wp-top-info-bar-admin__custom" aria-labelledby="wp-top-info-bar-custom-heading">
-						<h3 id="wp-top-info-bar-custom-heading"><?php esc_html_e('Custom', 'wp-top-info-bar'); ?></h3>
+						<section class="wp-top-info-bar-admin__general-block wp-top-info-bar-admin__custom">
 						<table class="form-table" role="presentation"><tbody><?php do_settings_fields(WP_Top_Info_Bar_Settings::MENU_SLUG, WP_Top_Info_Bar_Settings::SETTINGS_SECTION . '_custom'); ?></tbody></table>
 						</section>
 						<?php endif; ?>
@@ -417,8 +426,17 @@ final class WP_Top_Info_Bar_Admin {
 						<?php endif; ?>
 					</fieldset>
 				<?php endforeach; ?>
+						</div>
+						<div class="wp-top-info-bar-image-modal__footer"><button type="button" class="button" data-bar-settings-close><?php esc_html_e('Done', 'wp-top-info-bar'); ?></button></div>
+					</div>
 				</div>
-				<?php WP_Top_Info_Bar_Preview::render_panel(); ?>
+				</div>
+				<?php
+				ob_start();
+				$this->render_enabled_field();
+				$enabled_control = ob_get_clean();
+				WP_Top_Info_Bar_Preview::render_panel($enabled_control);
+				?>
 				</div>
 		</div>
 		<?php

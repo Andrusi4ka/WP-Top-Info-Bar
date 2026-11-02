@@ -139,7 +139,7 @@ class WP_Top_Info_Bar_Preview {
 	/**
 	 * The preview column: rotation, device switcher, Update and device frame.
 	 */
-	public static function render_panel() {
+	public static function render_panel( $enabled_control = '' ) {
 		printf(
 			'<div class="wp-top-info-bar-admin__preview wp-top-info-bar-preview" data-url="%1$s" data-action="%2$s" data-post="%3$d" data-nonce="%4$s" data-sizes="%5$s" data-devices="%6$s">',
 			esc_url( admin_url( 'admin-ajax.php' ) ),
@@ -151,6 +151,7 @@ class WP_Top_Info_Bar_Preview {
 		);
 
 		echo '<div class="wp-top-info-bar-preview__bar">';
+		echo '<div class="wp-top-info-bar-preview__toolbar-left">';
 		echo '<span class="wp-top-info-bar-preview__title">' . esc_html__( 'Preview', 'wp-top-info-bar' ) . '</span>';
 		// Always here (the bar stays as it is), greyed for Desktop (admin.js).
 		printf(
@@ -161,6 +162,12 @@ class WP_Top_Info_Bar_Preview {
 
 		// Device controls match the WP Maps Embed preview.
 		echo '<button type="button" class="button wp-top-info-bar-preview__dev" aria-pressed="false" disabled><span class="dashicons dashicons-editor-code" aria-hidden="true"></span><span>' . esc_html__('Developer mode', 'wp-top-info-bar') . '</span></button>';
+		echo '</div>';
+		if ( '' !== $enabled_control ) {
+			// Trusted enabled-field markup stays in the post form, centered above the devices.
+			echo '<div class="wp-top-info-bar-admin__switch wp-top-info-bar-admin__enable">' . $enabled_control . '</div>';
+		}
+		echo '<div class="wp-top-info-bar-preview__toolbar-right">';
 		echo '<div class="wp-top-info-bar-preview__devices" role="group" aria-label="' . esc_attr__( 'Device', 'wp-top-info-bar' ) . '">';
 		$names = self::device_names();
 		foreach ( array( 'desktop' => array( __( 'Desktop', 'wp-top-info-bar' ), 'dashicons-desktop' ), 'tablet' => array( __( 'Tablet', 'wp-top-info-bar' ), 'dashicons-tablet' ), 'mobile' => array( __( 'Mobile', 'wp-top-info-bar' ), 'dashicons-smartphone' ) ) as $device => $meta ) {
@@ -177,6 +184,7 @@ class WP_Top_Info_Bar_Preview {
 
 		echo '<button type="button" class="button wp-top-info-bar-preview__update"><span class="dashicons dashicons-update" aria-hidden="true"></span>' . esc_html__( 'Update', 'wp-top-info-bar' ) . '</button>';
 		echo '</div>';
+		echo '</div>';
 
 		// A device turned sideways whose screen then takes another device's settings (admin.js shows it).
 		foreach ( self::turned_notes() as $device => $note ) {
@@ -187,6 +195,8 @@ class WP_Top_Info_Bar_Preview {
 			);
 		}
 
+		echo '<div class="wp-top-info-bar-preview__content">';
+		echo '<p class="wp-top-info-bar-preview__animation-note">' . esc_html__( 'The Top Bar, its zones and each element have their own animation settings. Check which animations are enabled. To animate one element independently, set its own animation and disable any bar or zone animation that should not affect it.', 'wp-top-info-bar' ) . '</p>';
 		echo '<div class="wp-top-info-bar-preview__stage">';
 		printf(
 			'<iframe class="wp-top-info-bar-preview__frame" name="wp-top-info-bar-preview-%1$d" title="%2$s" src="about:blank"></iframe>',
@@ -203,6 +213,7 @@ class WP_Top_Info_Bar_Preview {
 		}
 		echo '</div>';
 
+		echo '</div>';
 		echo '</div>';
 	}
 

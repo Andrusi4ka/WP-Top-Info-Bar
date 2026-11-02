@@ -20,7 +20,7 @@ final class WP_Top_Info_Bar_Settings {
 
 	public function get_defaults(): array {
 		return array(
-			'enabled'          => 0,
+			'enabled'          => 1,
 			'message'          => '',
 			'layout_order' => array(),
 			'layout_zones' => array(),

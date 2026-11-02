@@ -59,6 +59,7 @@
  });
  const $error=$('<p class="description wp-top-info-bar-preview__error" role="status" hidden></p>').text((window.wpTopInfoBarAdmin||{}).previewError||'Could not load the preview. Try Update again.').appendTo($preview);
  $box.on('input change','input,textarea,select',syncStale);
+ $form.on('input change', '#wp-top-info-bar-enabled', syncStale);
  $box.on('wpTopInfoBarTextsChanged wpTopInfoBarButtonsChanged',syncStale);
  // Saving uses WordPress's Publish box. Preview updates never save the form.
  const savedState = state() + ($('#title').val() || '');

@@ -264,6 +264,43 @@
 	}
 
 	$(function () {
+		// Main Layout gear opens the existing form fields without moving the preview.
+		const $barSettingsModal = $('#wp-top-info-bar-settings-modal');
+		const $barSettingsGear = $('[data-bar-settings-open]');
+		let barSettingsOpener = null;
+		function closeBarSettings() {
+			$barSettingsModal.find('.wp-top-info-bar-color-pick').each(function () {
+				const picker = $(this).data('pickr');
+				if (picker) picker.hide();
+			});
+			hideHelp();
+			$barSettingsModal.prop('hidden', true);
+			$('body').removeClass('wp-top-info-bar-modal-open');
+			$barSettingsGear.attr('aria-expanded', 'false');
+			if (barSettingsOpener) $(barSettingsOpener).trigger('focus');
+		}
+		$barSettingsGear.on('click', function () {
+			barSettingsOpener = this;
+			$(this).attr('aria-expanded', 'true');
+			$barSettingsModal.prop('hidden', false);
+			$('body').addClass('wp-top-info-bar-modal-open');
+			$barSettingsModal.find('button[data-bar-settings-close]').first().trigger('focus');
+		});
+		$barSettingsModal.find('[data-bar-settings-close]').on('click', closeBarSettings);
+		$(document).on('keydown.wpTopInfoBarSettingsModal', function (event) {
+			if ($barSettingsModal.prop('hidden') || $(event.target).closest('.pcr-app').length) return;
+			if (event.key === 'Escape') {
+				event.preventDefault();
+				closeBarSettings();
+			}
+			if (event.key === 'Tab') {
+				const $items = $barSettingsModal.find('button, input, select, textarea, [tabindex="0"]').filter(':visible:not(:disabled)');
+				const first = $items[0], last = $items[$items.length - 1];
+				if (event.shiftKey && event.target === first) { event.preventDefault(); last.focus(); }
+				else if (!event.shiftKey && event.target === last) { event.preventDefault(); first.focus(); }
+			}
+		});
+		// End main settings dialog.
 		// Render help outside the scrollable modal and clamp it to the viewport.
 		let $floatingHelp = null, $helpSource = null;
 		function hideHelp() {
@@ -340,13 +377,12 @@
 		function closeZoneModal() {
 			$zoneModal.find('.wp-top-info-bar-color-pick').each(function () { const picker = $(this).data('pickr'); if (picker) picker.hide(); });
 			$zoneModal.prop('hidden', true); $('body').removeClass('wp-top-info-bar-modal-open');
-			if (zoneOpener) $(zoneOpener).trigger('focus');
+			if (zoneOpener) $(zoneOpener).attr('aria-expanded', 'false').trigger('focus');
 		}
 		$('[data-layout-zone]').each(function () {
 			const $zone = $(this), zone = $zone.attr('data-layout-zone');
-			const $tools = $('<div class="wp-top-info-bar-zone-tools"></div>').prependTo($zone);
-			$('<button type="button" class="wp-top-info-bar-zone-tools__toggle" data-zone-edit aria-haspopup="dialog" aria-label="Edit zone"><span class="dashicons dashicons-edit" aria-hidden="true"></span></button>').appendTo($tools).on('click', function () {
-				zoneOpener = this;
+			$zone.children('[data-zone-edit]').on('click', function () {
+				zoneOpener = this; $(this).attr('aria-expanded', 'true');
 				$zoneModal.find('[data-zone-settings]').each(function () { this.hidden = $(this).attr('data-zone-settings') !== zone; });
 				$('#wp-top-info-bar-zone-modal-title').text(zone.charAt(0).toUpperCase() + zone.slice(1) + ' zone');
 				$zoneModal.prop('hidden', false); $('body').addClass('wp-top-info-bar-modal-open');

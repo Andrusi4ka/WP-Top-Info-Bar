@@ -385,3 +385,183 @@
 }
 
 .wp-top-info-bar-admin__enable{padding:8px 0;margin-bottom:6px}
+
+/* A rounded dashed tab joins the gear to the Layout frame. */
+#wp-top-info-bar-layout .wp-top-info-bar-layout-field {
+	display: flex;
+	align-items: center;
+	gap: 0;
+}
+
+#wp-top-info-bar-layout .wp-top-info-bar-layout-builder {
+	flex: 1;
+	min-width: 0;
+}
+
+#wp-top-info-bar-layout .wp-top-info-bar-layout-icon {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 36px;
+	width: 36px;
+	height: 44px;
+	box-sizing: border-box;
+	margin-right: -1px;
+	border: 1px dashed #a7aaad;
+	border-right: 0;
+	border-radius: 22px 0 0 22px;
+	background: #f2f2f2;
+	font-size: 20px;
+	line-height: 1;
+	color: #646970;
+}
+/* Outer frame includes the gear tab; the inner frame encloses the three zones. */
+#wp-top-info-bar-layout .wp-top-info-bar-layout-builder {
+	box-sizing: border-box;
+	margin: 12px 0;
+	padding: 8px;
+	border: 1px dashed #a7aaad;
+	border-radius: 4px;
+	background: #f2f2f2;
+}
+
+#wp-top-info-bar-layout .wp-top-info-bar-layout-builder__frame {
+	margin: 0;
+}
+/* Each zone has a decorative gear in a rounded right-hand tab. */
+#wp-top-info-bar-layout .wp-top-info-bar-layout-builder__frame > [data-layout-zone]:not([data-layout-zone="right"]) {
+	margin-right: 35px;
+}
+
+#wp-top-info-bar-layout .wp-top-info-bar-zone-icon {
+	position: absolute;
+	top: 50%;
+	right: -36px;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 44px;
+	box-sizing: border-box;
+	transform: translateY(-50%);
+	border: 1px dashed #a7aaad;
+	border-left: 0;
+	border-radius: 0 22px 22px 0;
+	background: #f2f2f2;
+	color: #646970;
+	font-size: 20px;
+	line-height: 1;
+}
+/* Reserve room for the final tab inside the outer Layout frame. */
+#wp-top-info-bar-layout .wp-top-info-bar-layout-builder__frame {
+	margin-right: 35px;
+}
+
+#wp-top-info-bar-layout .wp-top-info-bar-layout-builder__frame > [data-layout-zone="center"] {
+	border-right: 1px dashed #a7aaad;
+}
+
+#wp-top-info-bar-layout .wp-top-info-bar-layout-builder__frame > [data-layout-zone="right"] {
+	border-left: 0;
+}
+/* Hovering a gear gently shades the area it belongs to. */
+#wp-top-info-bar-layout .wp-top-info-bar-layout-field:has(> .wp-top-info-bar-layout-icon:hover) .wp-top-info-bar-layout-builder,
+#wp-top-info-bar-layout .wp-top-info-bar-layout-field:has(> .wp-top-info-bar-layout-icon:hover) .wp-top-info-bar-layout-builder__frame,
+#wp-top-info-bar-layout .wp-top-info-bar-layout-field:has(> .wp-top-info-bar-layout-icon:hover) .wp-top-info-bar-layout-icon,
+#wp-top-info-bar-layout .wp-top-info-bar-layout-field:has(> .wp-top-info-bar-layout-icon:hover) .wp-top-info-bar-zone-icon,
+#wp-top-info-bar-layout .wp-top-info-bar-layout-builder__frame > [data-layout-zone]:has(> .wp-top-info-bar-zone-icon:hover),
+#wp-top-info-bar-layout .wp-top-info-bar-zone-icon:hover {
+	background: #d9d9d9;
+}
+#wp-top-info-bar-layout .wp-top-info-bar-layout-icon,
+#wp-top-info-bar-layout .wp-top-info-bar-zone-icon {
+	cursor: pointer;
+}
+
+
+/* Shade behind the previous zone's tab; its raised, opaque gear preserves the curved cutout. */
+#wp-top-info-bar-layout .wp-top-info-bar-layout-builder__frame > [data-layout-zone]:not([data-layout-zone="left"]):has(> .wp-top-info-bar-zone-icon:hover)::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	right: 100%;
+	width: 35px;
+	background: #d9d9d9;
+	pointer-events: none;
+}
+/* Zone gears are dialog buttons; preserve their established tab styling. */
+#wp-top-info-bar-layout button.wp-top-info-bar-zone-icon {
+	padding: 0;
+	appearance: none;
+}
+
+#wp-top-info-bar-layout button.wp-top-info-bar-zone-icon:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+}
+#wp-top-info-bar-layout button.wp-top-info-bar-layout-icon {
+	padding: 0;
+	appearance: none;
+}
+
+#wp-top-info-bar-layout button.wp-top-info-bar-layout-icon:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+}
+
+.wp-top-info-bar-bar-settings-modal .wp-top-info-bar-image-modal__panel {
+	width: 800px;
+}
+/* Center the bar switch above the devices, between the toolbar groups. */
+.wp-top-info-bar-preview .wp-top-info-bar-preview__bar {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	align-items: center;
+	gap: 12px;
+}
+
+.wp-top-info-bar-preview__toolbar-left,
+.wp-top-info-bar-preview__toolbar-right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.wp-top-info-bar-preview__toolbar-right {
+	justify-content: flex-end;
+}
+
+.wp-top-info-bar-preview__bar > .wp-top-info-bar-admin__enable {
+	margin: 0;
+	padding: 0;
+	white-space: nowrap;
+}
+
+@container (max-width: 900px) {
+	.wp-top-info-bar-preview .wp-top-info-bar-preview__bar {
+		grid-template-columns: minmax(0, 1fr) auto;
+	}
+
+	.wp-top-info-bar-preview__toolbar-right {
+		grid-column: 1 / -1;
+		justify-content: center;
+		flex-wrap: wrap;
+	}
+}
+
+@container (max-width: 520px) {
+	.wp-top-info-bar-preview .wp-top-info-bar-preview__bar {
+		grid-template-columns: minmax(0, 1fr);
+		justify-items: center;
+	}
+
+	.wp-top-info-bar-preview__toolbar-left {
+		justify-content: center;
+		flex-wrap: wrap;
+	}
+}
