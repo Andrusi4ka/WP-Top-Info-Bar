@@ -4,7 +4,7 @@ Tags: notification bar, top bar, announcement, banner, promo
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.0.0
+Stable tag: 4.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,15 +12,19 @@ An information bar at the very top of the site: text, colours, spacing, animatio
 
 == Description ==
 
-WP Top Bar adds a "Top Bar" menu where you set up a bar shown above everything else on the site (through the theme's `wp_body_open` hook).
+WP Top Bar adds a "WP Top Bar" menu where you create one or more bars shown above everything else on the site (through the theme's `wp_body_open` hook), or anywhere through a shortcode.
 
-* Message text, background and text colour.
-* Text size, padding and margin, each with its own value for desktop, tablet (up to 1024px) and phone (up to 767px).
-* Text animations: fade in, slide up, fade from left or right, slide from the page edge, blink, scale up; with a start delay.
-* Images left or right of the text, or above or below it, each with its own size, margin, animation, delay and CSS class.
+* Several bars, each with its own priority (lower numbers appear higher), an on/off switch in the list, and cloning.
+* A layout builder with left, centre and right zones: drag texts, buttons and images between them.
+* Text elements with the WordPress editor, their own size and colour.
+* Buttons with a link, size, corners, style and colours.
+* Images with their own size, margin, animation, delay and CSS class.
+* Background, bottom border and shadow; padding and margin per side.
+* Animations for the bar, for each zone and for each image, including a marquee; with a start delay.
+* Desktop, tablet (up to 1024px) and phone (up to 767px) values for sizes, spacing and animations.
+* A live preview in desktop, tablet and phone frames, with a developer overlay showing padding and margins.
 * Custom CSS classes and HTML id for the bar.
 * Animations are switched off for visitors who ask for reduced motion.
-* Settings that do not apply (a delay without an animation) are greyed out and keep their values.
 
 Bundles [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-checker) 5 (MIT).
 
@@ -28,7 +32,7 @@ Bundles [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-che
 
 1. Download `wp-top-info-bar.zip` from the latest release on https://github.com/Andrusi4ka/WP-Top-Info-Bar/releases.
 2. In WordPress go to Plugins > Add New > Upload Plugin and upload the zip, then activate it.
-3. Open "Top Bar" in the admin menu, enter the text and tick "Enable bar".
+3. Open "WP Top Bar" > "Add New" in the admin menu, add a text, button or image, tick "Enable bar" and publish.
 
 Later versions are offered under Plugins like any other update.
 
@@ -36,17 +40,30 @@ Later versions are offered under Plugins like any other update.
 
 = The bar does not show =
 
-The theme must call `wp_body_open()` right after `<body>` (most themes do, Woodmart included), "Enable bar" must be ticked, and the bar needs a text or at least one image.
+The theme must call `wp_body_open()` right after `<body>` (most themes do, Woodmart included), the bar must be published with "Enable bar" ticked, and it needs a text, a button or an image.
 
 = What is removed when I delete the plugin? =
 
-Its settings. Images chosen for the bar stay in the media library.
+Its bars and settings. Images chosen for the bar stay in the media library.
 
 = Where do updates come from? =
 
 From this plugin's GitHub releases. The plugin header's "Update URI" stops WordPress from offering a wordpress.org plugin of the same folder name.
 
 == Changelog ==
+
+= 4.0.0 =
+* Several bars: each is edited with the WordPress publish box, has a priority and a shortcode, and can be switched on or off and cloned from the list.
+* The existing bar is copied into the first new bar on the first admin visit (the old settings are kept as a backup).
+* Layout builder with left, centre and right zones, each with its own width, background, spacing and animation.
+* Texts (WordPress editor), buttons and images are elements of their own, edited in dialogs.
+* Bottom border, shadow and a colour picker with transparency.
+* Marquee animation; bar animations can differ on tablet and phone.
+* Live preview in device frames, with a developer overlay.
+* Fixed: the preview asked for a text or image while the bar had a text or button.
+* Fixed: calc() with "+" in a size was broken; a value with an unclosed bracket or a comment could disable the bar's other styles.
+* Faster: the site looks up the bars once per page; the admin no longer builds the bar settings on every screen.
+* Deleting the plugin now removes all its bars, auto-drafts included.
 
 = 3.0.0 =
 * Updates from GitHub releases, shown under Plugins like any other update.

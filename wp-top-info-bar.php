@@ -3,7 +3,7 @@
  * Plugin Name:       WP Top Bar
  * Plugin URI:        https://github.com/Andrusi4ka/WP-Top-Info-Bar
  * Description:       Adds a configurable information bar at the very top of the site.
- * Version:           3.0.0
+ * Version:           4.0.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Relevant AS (Andrii Boiko)
@@ -22,7 +22,7 @@ if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('WP_TOP_INFO_BAR_VERSION', '3.0.0');
+define('WP_TOP_INFO_BAR_VERSION', '4.0.0');
 define('WP_TOP_INFO_BAR_REPOSITORY', 'https://github.com/Andrusi4ka/WP-Top-Info-Bar/');
 define('WP_TOP_INFO_BAR_FILE', __FILE__);
 define('WP_TOP_INFO_BAR_PATH', plugin_dir_path(__FILE__));

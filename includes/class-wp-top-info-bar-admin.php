@@ -16,7 +16,7 @@ final class WP_Top_Info_Bar_Admin {
 
 		add_action('init', array($this, 'register_post_type'));
 		add_action('admin_init', array($this, 'migrate_settings'));
-		add_action('admin_init', array($this, 'register_settings'));
+		// Settings fields are registered by render_settings_box(), for the bar being edited.
 		add_action('add_meta_boxes_' . WP_Top_Info_Bar_Settings::POST_TYPE, array($this, 'add_meta_boxes'));
 		add_action('save_post_' . WP_Top_Info_Bar_Settings::POST_TYPE, array($this, 'save'), 10, 2);
 		add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
@@ -317,7 +317,7 @@ final class WP_Top_Info_Bar_Admin {
 				$title = '<div class="wp-top-info-bar-admin__switch"><input type="hidden" name="' . esc_attr($name) . '" value="0"><label><input type="checkbox" data-spacing-toggle="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="1"' . checked($enabled, true, false) . '> ' . esc_html($field['label']) . '</label></div>';
 			}
 			if (in_array($id, array('font_size', 'padding', 'margin', 'animation', 'text_delay', 'marquee_speed'), true)) {
-				$title .= '<span class="wp-top-info-bar-admin__devices" role="group" aria-label="' . esc_attr($field['label'] . ' ? ' . __('Device', 'wp-top-info-bar')) . '">';
+				$title .= '<span class="wp-top-info-bar-admin__devices" role="group" aria-label="' . esc_attr($field['label'] . ' - ' . __('Device', 'wp-top-info-bar')) . '">';
 				foreach (array('desktop' => array(__('Desktop', 'wp-top-info-bar'), 'dashicons-desktop'), 'tablet' => array(__('Tablet', 'wp-top-info-bar'), 'dashicons-tablet'), 'mobile' => array(__('Mobile', 'wp-top-info-bar'), 'dashicons-smartphone')) as $device => $meta) {
 					$title .= '<button type="button" class="wp-top-info-bar-admin__device" data-device="' . esc_attr($device) . '" aria-label="' . esc_attr($meta[0]) . '" title="' . esc_attr($meta[0]) . '" aria-pressed="' . ('desktop' === $device ? 'true' : 'false') . '"><span class="dashicons ' . esc_attr($meta[1]) . '" aria-hidden="true"></span></button>';
 				}
@@ -397,7 +397,7 @@ final class WP_Top_Info_Bar_Admin {
 							<button type="button" class="wp-top-info-bar-image-modal__close" data-bar-settings-close aria-label="<?php esc_attr_e('Close', 'wp-top-info-bar'); ?>"><span class="dashicons dashicons-no-alt" aria-hidden="true"></span></button>
 						</div>
 						<div class="wp-top-info-bar-image-modal__body">
-
+				
 				<?php foreach (self::pages() as $page => $meta) : ?>
 					<fieldset class="wp-top-info-bar-admin__page" id="wp-top-info-bar-page-<?php echo esc_attr($page); ?>" data-page="<?php echo esc_attr($page); ?>"<?php echo 'generell' === $page ? '' : ' hidden'; ?>>
 						<legend><?php echo esc_html($meta[0]); ?></legend>
@@ -519,7 +519,7 @@ final class WP_Top_Info_Bar_Admin {
 			<?php if ('border' === $kind) : ?>
 			<div class="wp-top-info-bar-decoration__border-width"><?php $this->image_device_heading(__('Width (px)', 'wp-top-info-bar'), __('Bottom border thickness in pixels. Set 0 to hide it. Empty tablet and mobile fields inherit the value from the larger screen.', 'wp-top-info-bar')); ?>
 			<?php foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) : ?>
-			<div class="wp-top-info-bar-admin__responsive-device" data-device="<?php echo esc_attr($device); ?>"<?php echo '' === $suffix ? '' : ' hidden'; ?>><input type="number" min="0" max="50" step="any" class="regular-text" name="<?php echo esc_attr($prefix . '[border_width' . $suffix . ']'); ?>" value="<?php echo esc_attr((string) $values['border_width' . $suffix]); ?>" placeholder="<?php echo '' === $suffix ? '2' : 'Inherit'; ?>"></div>
+			<div class="wp-top-info-bar-admin__responsive-device" data-device="<?php echo esc_attr($device); ?>"<?php echo '' === $suffix ? '' : ' hidden'; ?>><input type="number" min="0" max="50" step="any" class="regular-text" name="<?php echo esc_attr($prefix . '[border_width' . $suffix . ']'); ?>" value="<?php echo esc_attr((string) $values['border_width' . $suffix]); ?>" placeholder="<?php echo '' === $suffix ? '2' : esc_attr__('Inherit', 'wp-top-info-bar'); ?>"></div>
 			<?php endforeach; ?></div>
 			<?php else : ?>
 			<div class="wp-top-info-bar-decoration__shadow-values">
@@ -550,7 +550,7 @@ final class WP_Top_Info_Bar_Admin {
 						<div class="wp-top-info-bar-zone-modal__field">
 						<?php $this->image_device_heading(__('Width', 'wp-top-info-bar'), __('Use px, %, or auto. A number without a unit is pixels. Empty tablet/mobile fields inherit from the larger screen.', 'wp-top-info-bar')); ?>
 						<?php foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) : ?>
-						<div class="wp-top-info-bar-admin__responsive-device" data-device="<?php echo esc_attr($device); ?>"<?php echo 'desktop' === $device ? '' : ' hidden'; ?>><input type="text" class="regular-text" name="<?php echo esc_attr($prefix . '[width' . $suffix . ']'); ?>" value="<?php echo esc_attr($values['width' . $suffix] ?? ''); ?>" placeholder="<?php echo 'desktop' === $device ? ('center' === $zone ? 'Fill available space' : 'auto') : 'Inherit'; ?>" aria-label="<?php echo esc_attr(sprintf(__('Zone width: %s', 'wp-top-info-bar'), $device)); ?>"></div>
+						<div class="wp-top-info-bar-admin__responsive-device" data-device="<?php echo esc_attr($device); ?>"<?php echo 'desktop' === $device ? '' : ' hidden'; ?>><input type="text" class="regular-text" name="<?php echo esc_attr($prefix . '[width' . $suffix . ']'); ?>" value="<?php echo esc_attr($values['width' . $suffix] ?? ''); ?>" placeholder="<?php echo 'desktop' === $device ? ('center' === $zone ? esc_attr__('Fill available space', 'wp-top-info-bar') : 'auto') : esc_attr__('Inherit', 'wp-top-info-bar'); ?>" aria-label="<?php echo esc_attr(sprintf(__('Zone width: %s', 'wp-top-info-bar'), $device)); ?>"></div>
 						<?php endforeach; ?>
 						</div>
 						<div class="wp-top-info-bar-zone-modal__field"><label><?php esc_html_e('Background', 'wp-top-info-bar'); ?></label><?php $this->color('zone_settings][' . $zone . '][background_color', $values['background_color'] ?? 'rgba(0,0,0,0)', 'rgba(0,0,0,0)'); ?></div>
@@ -583,7 +583,7 @@ final class WP_Top_Info_Bar_Admin {
 						<?php if ('' !== $suffix) : ?><option value=""<?php selected($value, ''); ?>><?php esc_html_e('Same as larger screen', 'wp-top-info-bar'); ?></option><?php endif; ?>
 						<?php $effect_mode = $values['animation_mode'] ?? 'inherit'; foreach (array('_tablet', '_mobile') as $mode_suffix) { if ('' === $suffix) { break; } if (! empty($values['animation_mode' . $mode_suffix])) { $effect_mode = $values['animation_mode' . $mode_suffix]; } if ($suffix === $mode_suffix) { break; } } if ('none' === $effect_mode) { $value = 'none'; } foreach ($effects as $option => $text) : ?><option value="<?php echo esc_attr($option); ?>"<?php selected($value, $option); ?>><?php echo esc_html($text); ?></option><?php endforeach; ?>
 						</select>
-						<?php else : ?><input class="regular-text" type="<?php echo 'animation_speed' === $key ? 'number' : 'text'; ?>" name="<?php echo esc_attr($prefix . '[' . $key . $suffix . ']'); ?>" value="<?php echo esc_attr((string) $value); ?>" placeholder="<?php echo '' === $suffix ? ('animation_speed' === $key ? '60' : '0s') : 'Inherit'; ?>"<?php echo 'animation_speed' === $key ? ' min="1" max="1000" step="any"' : ''; ?>><?php endif; ?>
+						<?php else : ?><input class="regular-text" type="<?php echo 'animation_speed' === $key ? 'number' : 'text'; ?>" name="<?php echo esc_attr($prefix . '[' . $key . $suffix . ']'); ?>" value="<?php echo esc_attr((string) $value); ?>" placeholder="<?php echo '' === $suffix ? ('animation_speed' === $key ? '60' : '0s') : esc_attr__('Inherit', 'wp-top-info-bar'); ?>"<?php echo 'animation_speed' === $key ? ' min="1" max="1000" step="any"' : ''; ?>><?php endif; ?>
 						</div>
 						<?php endforeach; ?>
 						</div>
@@ -620,7 +620,7 @@ final class WP_Top_Info_Bar_Admin {
 					<div class="wp-top-info-bar-text-modal__field">
 					<?php $this->image_device_heading(__('Size (px)', 'wp-top-info-bar'), __('Text size for each device. Empty tablet/mobile fields inherit from the larger screen.', 'wp-top-info-bar')); ?>
 					<?php foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) : ?>
-					<div class="wp-top-info-bar-admin__responsive-device" data-device="<?php echo esc_attr($device); ?>"<?php echo 'desktop' === $device ? '' : ' hidden'; ?>><input type="number" min="1" step="any" class="regular-text" data-text-edit="<?php echo esc_attr('font_size' . $suffix); ?>" placeholder="<?php echo 'desktop' === $device ? '14' : 'Inherit'; ?>"></div>
+					<div class="wp-top-info-bar-admin__responsive-device" data-device="<?php echo esc_attr($device); ?>"<?php echo 'desktop' === $device ? '' : ' hidden'; ?>><input type="number" min="1" step="any" class="regular-text" data-text-edit="<?php echo esc_attr('font_size' . $suffix); ?>" placeholder="<?php echo 'desktop' === $device ? '14' : esc_attr__('Inherit', 'wp-top-info-bar'); ?>"></div>
 					<?php endforeach; ?>
 					</div>
 					<div class="wp-top-info-bar-text-modal__field"><label><?php esc_html_e('Text color', 'wp-top-info-bar'); ?></label><?php $this->color('text_element_editor_color', '#ffffff', '#ffffff'); ?></div>
@@ -786,7 +786,7 @@ final class WP_Top_Info_Bar_Admin {
 		$id = 'marquee_speed' === $key ? 'marquee-speed' : 'text-delay';
 		foreach (array('desktop' => '', 'tablet' => '_tablet', 'mobile' => '_mobile') as $device => $suffix) {
 			echo '<div class="wp-top-info-bar-admin__responsive-device" data-device="' . esc_attr($device) . '"' . ('desktop' === $device ? '' : ' hidden') . '>';
-			echo '<input type="' . esc_attr($type) . '" id="wp-top-info-bar-' . esc_attr($id . $suffix) . '" name="' . esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME . '[' . $key . $suffix . ']') . '" value="' . esc_attr((string) $settings[$key . $suffix]) . '" class="regular-text" placeholder="' . esc_attr('' === $suffix ? $placeholder : 'Inherit') . '"' . ('number' === $type ? ' min="1" max="1000" step="any"' : '') . '></div>';
+			echo '<input type="' . esc_attr($type) . '" id="wp-top-info-bar-' . esc_attr($id . $suffix) . '" name="' . esc_attr(WP_Top_Info_Bar_Settings::OPTION_NAME . '[' . $key . $suffix . ']') . '" value="' . esc_attr((string) $settings[$key . $suffix]) . '" class="regular-text" placeholder="' . ('' === $suffix ? esc_attr($placeholder) : esc_attr__('Inherit', 'wp-top-info-bar')) . '"' . ('number' === $type ? ' min="1" max="1000" step="any"' : '') . '></div>';
 		}
 	}
 

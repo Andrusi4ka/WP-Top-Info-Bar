@@ -314,16 +314,32 @@ final class WP_Top_Info_Bar_Sanitizer {
 	}
 
 	public function sanitize_spacing_value(string $value): string {
-		$value = sanitize_text_field($value);
-
-		return preg_replace('/[^0-9a-zA-Z.%\-\s(),\/]/', '', $value) ?? '';
+		return self::css_value($value);
 	}
 
 	public function sanitize_css_size(string $value, string $fallback): string {
-		$value = sanitize_text_field($value);
-		$sanitized = preg_replace('/[^0-9a-zA-Z.%\-\s(),\/]/', '', $value) ?? '';
+		$sanitized = self::css_value($value);
 
 		return '' !== trim($sanitized) ? $sanitized : $fallback;
+	}
+
+	/**
+	 * A CSS length such as 12px, 1rem or calc(1px + 2vw). Values go into inline
+	 * style attributes, so a comment or an unclosed bracket (which would swallow
+	 * the declarations after it) makes the whole value empty.
+	 */
+	private static function css_value(string $value): string {
+		$value = preg_replace('/[^0-9a-zA-Z.%\-+*\s(),\/]/', '', sanitize_text_field($value)) ?? '';
+		if (false !== strpos($value, '/*') || false !== strpos($value, '*/')) {
+			return '';
+		}
+		$depth = 0;
+		foreach (str_split($value) as $char) {
+			if ('(' === $char) { ++$depth; }
+			if (')' === $char && --$depth < 0) { return ''; }
+		}
+
+		return 0 === $depth ? $value : '';
 	}
 
 	public function sanitize_class_list(string $classes): string {

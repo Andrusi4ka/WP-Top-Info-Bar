@@ -2,7 +2,7 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: WP Top Bar 3.0.0\n"
+"Project-Id-Version: WP Top Bar 4.0.0\n"
 "Report-Msgid-Bugs-To: https://github.com/Andrusi4ka/WP-Top-Info-Bar/issues\n"
 "POT-Creation-Date: 2026-10-10 20:43+0000\n"
 "MIME-Version: 1.0\n"

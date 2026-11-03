@@ -6,6 +6,8 @@ if (! defined('ABSPATH')) {
 
 final class WP_Top_Info_Bar_Frontend {
 	private WP_Top_Info_Bar_Settings $settings;
+	/** @var array|null Bars shown on this request (looked up once: enqueue and render both need them). */
+	private ?array $automatic = null;
 
 	public function __construct(WP_Top_Info_Bar_Settings $settings) {
 		$this->settings = $settings;
@@ -35,6 +37,7 @@ final class WP_Top_Info_Bar_Frontend {
 
 	/** Every published, enabled bar, with deterministic ties by ID. */
 	private function automatic_settings(): array {
+		if (null !== $this->automatic) { return $this->automatic; }
 		$posts = get_posts(array('post_type' => WP_Top_Info_Bar_Settings::POST_TYPE, 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'ID', 'order' => 'ASC'));
 		usort($posts, static function ($a, $b) { return max(1, (int) $a->menu_order) <=> max(1, (int) $b->menu_order) ?: $a->ID <=> $b->ID; });
 		$bars = array();
@@ -50,10 +53,12 @@ final class WP_Top_Info_Bar_Frontend {
 			$settings = $this->settings->get_settings();
 			if (! empty($settings['enabled']) && $this->has_content($settings)) { $bars[] = $settings; }
 		}
+		$this->automatic = $bars;
 		return $bars;
 	}
 
-	private function has_content(array $settings): bool {
+	/** Whether the bar has anything to show: an image, a text or a button. */
+	public function has_content(array $settings): bool {
 		if (! empty($settings['images'])) { return true; }
 		$sanitizer = new WP_Top_Info_Bar_Sanitizer();
 		foreach ($sanitizer->sanitize_text_elements($settings) as $element) { if ('' !== $element['message']) { return true; } }

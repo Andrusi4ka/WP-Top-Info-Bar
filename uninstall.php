@@ -7,12 +7,11 @@ if (! defined('WP_UNINSTALL_PLUGIN')) {
 $option_name = 'wp_top_info_bar_settings';
 
 function wp_top_info_bar_delete_data() {
-	foreach (get_posts(array('post_type' => 'wp_top_info_bar', 'post_status' => 'any', 'numberposts' => -1, 'fields' => 'ids')) as $id) {
-		wp_delete_post($id, true);
-	}
-	// Trashed posts are excluded by post_status=any.
-	foreach (get_posts(array('post_type' => 'wp_top_info_bar', 'post_status' => 'trash', 'numberposts' => -1, 'fields' => 'ids')) as $id) {
-		wp_delete_post($id, true);
+	global $wpdb;
+	// Every bar whatever its status (post_status=any leaves out trash and auto-drafts).
+	$ids = $wpdb->get_col($wpdb->prepare("SELECT ID FROM {$wpdb->posts} WHERE post_type = %s", 'wp_top_info_bar'));
+	foreach ($ids as $id) {
+		wp_delete_post((int) $id, true);
 	}
 	delete_option('wp_top_info_bar_settings');
 	delete_option('wp_top_info_bar_global_post');
